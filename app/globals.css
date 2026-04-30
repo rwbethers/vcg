@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #0A1628;
+  --navy-mid: #0F1F3D;
+  --navy-light: #1a3060;
+  --gold: #C9A84C;
+  --gold-light: #E8C96C;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
