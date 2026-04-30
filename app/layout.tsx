@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="h-full">
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="/api/icon" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={`${inter.className} h-full antialiased`}>{children}</body>
