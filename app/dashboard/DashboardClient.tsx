@@ -1,5 +1,8 @@
 "use client";
 import { useState } from "react";
+import CashValueSection from "./CashValueSection";
+import TaxStrategySection from "./TaxStrategySection";
+import ContactAdvisorSection from "./ContactAdvisorSection";
 
 interface Client {
   id: string;
@@ -443,8 +446,23 @@ export default function DashboardClient({ client, policies, actionItems }: Props
             </div>
           )}
 
+          {/* ── CASH VALUE ── */}
+          {activeNav === "Cash Value" && (
+            <CashValueSection policies={policies} />
+          )}
+
+          {/* ── TAX STRATEGY ── */}
+          {activeNav === "Tax Strategy" && (
+            <TaxStrategySection policies={policies} clientName={client.name} />
+          )}
+
+          {/* ── CONTACT ADVISOR ── */}
+          {activeNav === "Contact Advisor" && (
+            <ContactAdvisorSection advisorName={client.advisor} clientName={client.name} />
+          )}
+
           {/* ── COMING SOON SECTIONS ── */}
-          {["Cash Value", "Tax Strategy", "Documents", "Contact Advisor"].includes(activeNav) && (
+          {["Documents"].includes(activeNav) && (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="w-16 h-16 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/30 flex items-center justify-center mb-5">
                 <span className="text-[#C9A84C] text-2xl">
