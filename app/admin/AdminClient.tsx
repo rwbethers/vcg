@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 const clients = [
   {
@@ -120,11 +121,69 @@ const summaryMetrics = [
   { label: "Active Policies", value: "7" },
 ];
 
+interface SupabaseClient {
+  id: string;
+  name: string;
+}
+
+const docCategories = ["Statement", "Illustration", "Policy Document", "Tax Document", "Other"];
+
+function fmtSize(bytes: number) {
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 export default function AdminClient({ adminEmail }: { adminEmail: string }) {
   const [search, setSearch] = useState("");
   const [filterAdvisor, setFilterAdvisor] = useState("All");
 
+  // Document upload state
+  const [supabaseClients, setSupabaseClients] = useState<SupabaseClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [docCategory, setDocCategory] = useState("Statement");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docDragOver, setDocDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<"success" | "error" | null>(null);
+  const docFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("clients").select("id, name").order("name").then(({ data }) => {
+      if (data) setSupabaseClients(data);
+    });
+  }, []);
+
   const advisors = ["All", "Stephen Mongie", "Samuel Noel", "Zach McGlothin"];
+
+  const handleDocUpload = async () => {
+    if (!docFile || !selectedClientId) return;
+    setUploading(true);
+    setUploadResult(null);
+    const supabase = createClient();
+    const path = `${selectedClientId}/advisor/${Date.now()}_${docFile.name}`;
+    const { error: storageError } = await supabase.storage
+      .from("client-documents")
+      .upload(path, docFile);
+    if (!storageError) {
+      const { error: dbError } = await supabase.from("documents").insert({
+        client_id: selectedClientId,
+        file_name: docFile.name,
+        file_path: path,
+        file_size: docFile.size,
+        mime_type: docFile.type,
+        category: docCategory,
+        uploaded_by: "advisor",
+        uploaded_by_name: adminEmail,
+      });
+      setUploadResult(dbError ? "error" : "success");
+    } else {
+      setUploadResult("error");
+    }
+    if (!storageError) setDocFile(null);
+    setUploading(false);
+    setTimeout(() => setUploadResult(null), 4000);
+  };
 
   const filtered = clients.filter((c) => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
@@ -271,6 +330,102 @@ export default function AdminClient({ adminEmail }: { adminEmail: string }) {
             </div>
           </div>
         </div>
+        {/* Document Upload */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100">
+            <h2 className="text-[#0A1628] font-medium">Send Document to Client</h2>
+            <p className="text-slate-400 text-xs mt-0.5">Upload a file — it will appear instantly in that client's Documents tab.</p>
+          </div>
+          <div className="p-6 grid grid-cols-3 gap-6">
+            {/* Left: selectors */}
+            <div className="space-y-4 col-span-1">
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-2">Client</label>
+                <select
+                  value={selectedClientId}
+                  onChange={(e) => setSelectedClientId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-[#C9A84C] transition-colors"
+                >
+                  <option value="">Select a client…</option>
+                  {supabaseClients.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-2">Category</label>
+                <div className="flex flex-wrap gap-2">
+                  {docCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setDocCategory(cat)}
+                      className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        docCategory === cat
+                          ? "bg-[#C9A84C] text-[#0A1628] font-semibold"
+                          : "bg-gray-100 text-slate-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: drop zone */}
+            <div className="col-span-2 flex flex-col gap-4">
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDocDragOver(true); }}
+                onDragLeave={() => setDocDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDocDragOver(false); const f = e.dataTransfer.files[0]; if (f) setDocFile(f); }}
+                onClick={() => docFileRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors flex-1 flex flex-col items-center justify-center ${
+                  docDragOver ? "border-[#C9A84C] bg-[#C9A84C]/5"
+                  : docFile ? "border-green-400 bg-green-50"
+                  : "border-gray-200 hover:border-[#C9A84C] hover:bg-[#C9A84C]/5"
+                }`}
+              >
+                <input
+                  ref={docFileRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                  onChange={(e) => e.target.files?.[0] && setDocFile(e.target.files[0])}
+                />
+                {docFile ? (
+                  <div>
+                    <p className="text-green-700 text-sm font-medium">{docFile.name}</p>
+                    <p className="text-green-600 text-xs mt-1">{fmtSize(docFile.size)} · Ready to upload</p>
+                    <button onClick={(e) => { e.stopPropagation(); setDocFile(null); }} className="text-slate-400 text-xs mt-2 hover:text-slate-600 underline">Remove</button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-2xl mb-2">📎</p>
+                    <p className="text-slate-500 text-sm">Drag & drop or click to select</p>
+                    <p className="text-slate-400 text-xs mt-1">PDF, JPG, PNG, DOCX, XLSX</p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleDocUpload}
+                disabled={!docFile || !selectedClientId || uploading}
+                className={`py-3 rounded-xl text-xs font-semibold tracking-widest uppercase transition-all ${
+                  uploadResult === "success" ? "bg-green-50 text-green-700 border border-green-200 cursor-default"
+                  : uploadResult === "error" ? "bg-red-50 text-red-600 border border-red-200 cursor-default"
+                  : !docFile || !selectedClientId ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-[#C9A84C] hover:bg-[#E8C96C] text-[#0A1628] shadow-sm"
+                }`}
+              >
+                {uploadResult === "success" ? "✓ Document Sent to Client"
+                  : uploadResult === "error" ? "Upload Failed — Try Again"
+                  : uploading ? "Uploading…"
+                  : "Send to Client"}
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
