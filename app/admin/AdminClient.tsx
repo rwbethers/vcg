@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import MarketingTab from "./MarketingTab";
+import OverviewTab from "./OverviewTab";
 
 // ── Static client display data ──────────────────────────────
 const clientRows = [
@@ -58,6 +59,7 @@ interface DealInterest {
 }
 
 interface SupabaseClient { id: string; name: string; }
+interface Goal { id: string; metric: string; target: number; period: string; }
 
 const fmt = (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 function fmtDate(iso: string) {
@@ -68,7 +70,7 @@ function fmtSize(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export default function AdminClient({ adminEmail }: { adminEmail: string }) {
+export default function AdminClient({ adminEmail, goals: initialGoals }: { adminEmail: string; goals: Goal[] }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const tabs = ["Overview", "Pipeline", "Clients", "Deal Interests", "Marketing", "Documents"];
 
@@ -227,104 +229,12 @@ export default function AdminClient({ adminEmail }: { adminEmail: string }) {
 
         {/* ── OVERVIEW ── */}
         {activeTab === "Overview" && (
-          <div className="space-y-8">
-            <div>
-              <h1 className="text-2xl font-light text-[#0A1628]">Good morning</h1>
-              <p className="text-slate-400 text-sm mt-1">Here's what's happening across your book of business.</p>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-4 gap-5">
-              {[
-                { label: "Total Clients", value: "9", sub: "Active accounts", color: "border-[#C9A84C]", icon: "👥" },
-                { label: "Annual Premiums", value: "$101,019", sub: "Across all policies", color: "border-blue-400", icon: "💰" },
-                { label: "Pipeline Value", value: fmt(pipelineValue), sub: `${leads.filter(l => l.stage !== "Closed Won").length} active leads`, color: "border-purple-400", icon: "📈" },
-                { label: "Deal Interests", value: String(dealInterests.length), sub: "Private market requests", color: "border-emerald-400", icon: "🏦" },
-              ].map((m) => (
-                <div key={m.label} className={`bg-white rounded-2xl p-6 shadow-sm border-l-4 ${m.color}`}>
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-slate-400 text-[10px] uppercase tracking-widest">{m.label}</p>
-                    <span className="text-xl">{m.icon}</span>
-                  </div>
-                  <p className="text-[#0A1628] text-2xl font-light">{m.value}</p>
-                  <p className="text-slate-400 text-xs mt-1">{m.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Secondary metrics */}
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { label: "Total Death Benefit", value: "$14,038,693" },
-                { label: "Active Policies", value: "7" },
-                { label: "Leads in Pipeline", value: String(leads.length) },
-                { label: "Closed Won (YTD)", value: String(leads.filter(l => l.stage === "Closed Won").length) },
-              ].map((m) => (
-                <div key={m.label} className="bg-white rounded-xl p-4 shadow-sm text-center">
-                  <p className="text-[#C9A84C] text-lg font-semibold">{m.value}</p>
-                  <p className="text-slate-400 text-[10px] uppercase tracking-widest mt-1">{m.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent Deal Interests */}
-            {dealInterests.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-[#0A1628] font-medium text-sm">Recent Deal Interests</h2>
-                    <p className="text-slate-400 text-xs mt-0.5">Clients requesting more info on private market opportunities</p>
-                  </div>
-                  <button onClick={() => setActiveTab("Deal Interests")} className="text-[#C9A84C] text-xs hover:underline">View all →</button>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {dealInterests.slice(0, 5).map((di) => (
-                    <div key={di.id} className="px-6 py-3.5 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0">
-                          <span className="text-[#C9A84C] text-[10px] font-semibold">
-                            {di.client_name?.split(" ").map((w: string) => w[0]).slice(0, 2).join("")}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-[#0A1628] text-sm font-medium">{di.client_name}</p>
-                          <p className="text-slate-400 text-xs">{di.deal_title}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#C9A84C]/10 text-[#C9A84C] font-medium">{di.asset_class}</span>
-                        <span className="text-slate-400 text-xs">{fmtDate(di.created_at)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Pipeline snapshot */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-[#0A1628] font-medium text-sm">Pipeline Snapshot</h2>
-                  <p className="text-slate-400 text-xs mt-0.5">Lead distribution by stage</p>
-                </div>
-                <button onClick={() => setActiveTab("Pipeline")} className="text-[#C9A84C] text-xs hover:underline">Manage pipeline →</button>
-              </div>
-              <div className="px-6 py-5 grid grid-cols-5 gap-3">
-                {STAGES.map((stage) => {
-                  const count = leads.filter((l) => l.stage === stage).length;
-                  const value = leads.filter((l) => l.stage === stage).reduce((s, l) => s + (l.potential_premium || 0), 0);
-                  return (
-                    <div key={stage} className="text-center p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <p className="text-[#0A1628] text-xl font-light">{count}</p>
-                      <p className="text-slate-500 text-xs font-medium mt-1">{stage}</p>
-                      {value > 0 && <p className="text-[#C9A84C] text-[10px] mt-1">{fmt(value)}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <OverviewTab
+            leads={leads}
+            dealInterests={dealInterests}
+            goals={initialGoals}
+            onTabChange={setActiveTab}
+          />
         )}
 
         {/* ── PIPELINE ── */}

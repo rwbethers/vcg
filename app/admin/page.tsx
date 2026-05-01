@@ -17,5 +17,7 @@ export default async function AdminPage() {
 
   if (!adminEmails.includes(user.email ?? "")) redirect("/dashboard");
 
-  return <AdminClient adminEmail={user.email ?? ""} />;
+  const { data: goals } = await supabase.from("goals").select("*").order("metric");
+
+  return <AdminClient adminEmail={user.email ?? ""} goals={goals ?? []} />;
 }
