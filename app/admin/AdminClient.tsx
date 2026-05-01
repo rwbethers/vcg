@@ -2,53 +2,21 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import MarketingTab from "./MarketingTab";
 import OverviewTab from "./OverviewTab";
 
-// ── Static client display data ──────────────────────────────
 const clientRows = [
-  { name: "Jeffrey Adams", type: "Individual", advisor: "Stephen Mongie", deathBenefit: "$2,615,225", cashValue: "$136,016", premiums: "$15,000", policies: 2, products: "Whole Life, Term", status: "Active" },
-  { name: "Elisabeth Andelin", type: "Individual / Trust", advisor: "Stephen Mongie", deathBenefit: "$7,384,336", cashValue: "$197,954", premiums: "$69,751", policies: 2, products: "Whole Life, FIUL", status: "Active" },
-  { name: "J. Brandt Anderson", type: "Individual / Plan", advisor: "Stephen Mongie", deathBenefit: "—", cashValue: "—", premiums: "—", policies: 2, products: "Term (Lapsed), VUL", status: "Under Review" },
-  { name: "Dallin Anderson", type: "Individual", advisor: "Samuel Noel", deathBenefit: "—", cashValue: "—", premiums: "—", policies: 1, products: "IUL (Lapsed)", status: "Under Review" },
-  { name: "Elizabeth Anderson", type: "Individual", advisor: "Samuel Noel", deathBenefit: "—", cashValue: "—", premiums: "—", policies: 0, products: "—", status: "Active" },
-  { name: "Gary Applegate", type: "Individual", advisor: "Zach McGlothin", deathBenefit: "—", cashValue: "—", premiums: "—", policies: 0, products: "Application Pending", status: "Work in Progress" },
-  { name: "Shane Atkinson", type: "Individual", advisor: "Zach McGlothin", deathBenefit: "—", cashValue: "—", premiums: "—", policies: 0, products: "Annuity (Keyport)", status: "Under Review" },
-  { name: "Teresa Auvaa", type: "Individual", advisor: "Stephen Mongie", deathBenefit: "$1,000,000", cashValue: "—", premiums: "$397", policies: 1, products: "Term", status: "Active" },
-  { name: "Tui Auvaa", type: "Individual", advisor: "Stephen Mongie", deathBenefit: "$3,039,132", cashValue: "$325", premiums: "$15,871", policies: 1, products: "Whole Life", status: "Active" },
+  { name: "Jeffrey Adams",       type: "Individual",         advisor: "Stephen Mongie", deathBenefit: "$2,615,225", cashValue: "$136,016", premiums: "$15,000", policies: 2, products: "Whole Life, Term",       status: "Active" },
+  { name: "Elisabeth Andelin",   type: "Individual / Trust", advisor: "Stephen Mongie", deathBenefit: "$7,384,336", cashValue: "$197,954", premiums: "$69,751", policies: 2, products: "Whole Life, FIUL",       status: "Active" },
+  { name: "J. Brandt Anderson",  type: "Individual / Plan",  advisor: "Stephen Mongie", deathBenefit: "—",          cashValue: "—",        premiums: "—",       policies: 2, products: "Term (Lapsed), VUL",    status: "Under Review" },
+  { name: "Dallin Anderson",     type: "Individual",         advisor: "Samuel Noel",    deathBenefit: "—",          cashValue: "—",        premiums: "—",       policies: 1, products: "IUL (Lapsed)",           status: "Under Review" },
+  { name: "Elizabeth Anderson",  type: "Individual",         advisor: "Samuel Noel",    deathBenefit: "—",          cashValue: "—",        premiums: "—",       policies: 0, products: "—",                     status: "Active" },
+  { name: "Gary Applegate",      type: "Individual",         advisor: "Zach McGlothin", deathBenefit: "—",          cashValue: "—",        premiums: "—",       policies: 0, products: "Application Pending",    status: "Work in Progress" },
+  { name: "Shane Atkinson",      type: "Individual",         advisor: "Zach McGlothin", deathBenefit: "—",          cashValue: "—",        premiums: "—",       policies: 0, products: "Annuity (Keyport)",      status: "Under Review" },
+  { name: "Teresa Auvaa",        type: "Individual",         advisor: "Stephen Mongie", deathBenefit: "$1,000,000", cashValue: "—",        premiums: "$397",    policies: 1, products: "Term",                   status: "Active" },
+  { name: "Tui Auvaa",           type: "Individual",         advisor: "Stephen Mongie", deathBenefit: "$3,039,132", cashValue: "$325",     premiums: "$15,871", policies: 1, products: "Whole Life",             status: "Active" },
 ];
 
-const STAGES = ["Prospect", "Contacted", "Meeting Set", "Proposal Sent", "Closed Won"];
-
-const stageColors: Record<string, string> = {
-  "Prospect":      "bg-slate-100 text-slate-600",
-  "Contacted":     "bg-blue-50 text-blue-700",
-  "Meeting Set":   "bg-purple-50 text-purple-700",
-  "Proposal Sent": "bg-amber-50 text-amber-700",
-  "Closed Won":    "bg-green-50 text-green-700",
-};
-
-const sourceColors: Record<string, string> = {
-  "Referral":      "bg-[#C9A84C]/10 text-[#C9A84C]",
-  "Website":       "bg-blue-50 text-blue-600",
-  "Event":         "bg-purple-50 text-purple-600",
-  "Cold Outreach": "bg-slate-100 text-slate-600",
-};
-
 const docCategories = ["Statement", "Illustration", "Policy Document", "Tax Document", "Other"];
-
-interface Lead {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  source: string;
-  stage: string;
-  assigned_to: string | null;
-  potential_premium: number;
-  notes: string | null;
-  created_at: string;
-}
 
 interface DealInterest {
   id: string;
@@ -61,7 +29,6 @@ interface DealInterest {
 interface SupabaseClient { id: string; name: string; }
 interface Goal { id: string; metric: string; target: number; period: string; }
 
-const fmt = (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
@@ -72,24 +39,16 @@ function fmtSize(bytes: number) {
 
 export default function AdminClient({ adminEmail, goals: initialGoals }: { adminEmail: string; goals: Goal[] }) {
   const [activeTab, setActiveTab] = useState("Overview");
-  const tabs = ["Overview", "Pipeline", "Clients", "Deal Interests", "Marketing", "Documents"];
+  const tabs = ["Overview", "Clients", "Deal Interests", "Documents"];
 
-  // Pipeline state
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [showAddLead, setShowAddLead] = useState(false);
-  const [newLead, setNewLead] = useState({ name: "", email: "", phone: "", source: "Referral", assigned_to: "", potential_premium: "", notes: "" });
-  const [addingLead, setAddingLead] = useState(false);
-
-  // Deal interests
   const [dealInterests, setDealInterests] = useState<DealInterest[]>([]);
+  const [supabaseClients, setSupabaseClients] = useState<SupabaseClient[]>([]);
 
   // Clients tab
   const [search, setSearch] = useState("");
   const [filterAdvisor, setFilterAdvisor] = useState("All");
 
   // Documents tab
-  const [supabaseClients, setSupabaseClients] = useState<SupabaseClient[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [docCategory, setDocCategory] = useState("Statement");
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -100,9 +59,6 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.from("leads").select("*").order("created_at", { ascending: false }).then(({ data }) => {
-      if (data) setLeads(data);
-    });
     supabase.from("deal_interest").select("*").order("created_at", { ascending: false }).then(({ data }) => {
       if (data) setDealInterests(data);
     });
@@ -112,35 +68,10 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
   }, []);
 
   const advisors = ["All", "Stephen Mongie", "Samuel Noel", "Zach McGlothin"];
-  const filtered = clientRows.filter((c) => {
-    return c.name.toLowerCase().includes(search.toLowerCase()) &&
-      (filterAdvisor === "All" || c.advisor === filterAdvisor);
-  });
-
-  const pipelineValue = leads
-    .filter((l) => l.stage !== "Closed Won")
-    .reduce((sum, l) => sum + (l.potential_premium || 0), 0);
-
-  const handleStageChange = async (lead: Lead, newStage: string) => {
-    const supabase = createClient();
-    await supabase.from("leads").update({ stage: newStage, updated_at: new Date().toISOString() }).eq("id", lead.id);
-    setLeads((prev) => prev.map((l) => l.id === lead.id ? { ...l, stage: newStage } : l));
-    if (selectedLead?.id === lead.id) setSelectedLead({ ...lead, stage: newStage });
-  };
-
-  const handleAddLead = async () => {
-    if (!newLead.name) return;
-    setAddingLead(true);
-    const supabase = createClient();
-    const { data } = await supabase.from("leads").insert({
-      ...newLead,
-      potential_premium: parseFloat(newLead.potential_premium) || 0,
-    }).select().single();
-    if (data) setLeads((prev) => [data, ...prev]);
-    setNewLead({ name: "", email: "", phone: "", source: "Referral", assigned_to: "", potential_premium: "", notes: "" });
-    setShowAddLead(false);
-    setAddingLead(false);
-  };
+  const filtered = clientRows.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase()) &&
+    (filterAdvisor === "All" || c.advisor === filterAdvisor)
+  );
 
   const handleDocUpload = async () => {
     if (!docFile || !selectedClientId) return;
@@ -206,15 +137,11 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-5 py-3.5 text-xs font-medium transition-all relative ${
-                activeTab === tab
-                  ? "text-[#C9A84C]"
-                  : "text-slate-400 hover:text-slate-200"
+                activeTab === tab ? "text-[#C9A84C]" : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {tab}
-              {activeTab === tab && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C9A84C]" />
-              )}
+              {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C9A84C]" />}
               {tab === "Deal Interests" && dealInterests.length > 0 && (
                 <span className="ml-1.5 bg-[#C9A84C] text-[#0A1628] text-[9px] px-1.5 py-0.5 rounded-full font-bold">
                   {dealInterests.length}
@@ -230,68 +157,10 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
         {/* ── OVERVIEW ── */}
         {activeTab === "Overview" && (
           <OverviewTab
-            leads={leads}
             dealInterests={dealInterests}
             goals={initialGoals}
             onTabChange={setActiveTab}
           />
-        )}
-
-        {/* ── PIPELINE ── */}
-        {activeTab === "Pipeline" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-light text-[#0A1628]">Client Pipeline</h1>
-                <p className="text-slate-400 text-sm mt-1">{leads.length} leads · {fmt(pipelineValue)} in active pipeline</p>
-              </div>
-              <button
-                onClick={() => setShowAddLead(true)}
-                className="bg-[#C9A84C] hover:bg-[#E8C96C] text-[#0A1628] text-xs font-semibold px-5 py-2.5 rounded-xl tracking-widest uppercase transition-colors"
-              >
-                + Add Lead
-              </button>
-            </div>
-
-            {/* Kanban board */}
-            <div className="grid grid-cols-5 gap-4 items-start">
-              {STAGES.map((stage) => {
-                const stageLeads = leads.filter((l) => l.stage === stage);
-                return (
-                  <div key={stage} className="space-y-3">
-                    <div className="flex items-center justify-between px-1">
-                      <span className={`text-[10px] px-2.5 py-1 rounded-full font-semibold uppercase tracking-widest ${stageColors[stage]}`}>
-                        {stage}
-                      </span>
-                      <span className="text-slate-400 text-xs">{stageLeads.length}</span>
-                    </div>
-                    <div className="space-y-3 min-h-24">
-                      {stageLeads.map((lead) => (
-                        <button
-                          key={lead.id}
-                          onClick={() => setSelectedLead(lead)}
-                          className="w-full bg-white rounded-xl p-4 shadow-sm text-left hover:shadow-md transition-shadow border border-gray-100 hover:border-[#C9A84C]/30"
-                        >
-                          <p className="text-[#0A1628] text-sm font-medium leading-tight">{lead.name}</p>
-                          {lead.assigned_to && (
-                            <p className="text-slate-400 text-[10px] mt-1">{lead.assigned_to}</p>
-                          )}
-                          {lead.potential_premium > 0 && (
-                            <p className="text-[#C9A84C] text-xs font-semibold mt-2">{fmt(lead.potential_premium)}/yr</p>
-                          )}
-                          {lead.source && (
-                            <span className={`inline-block mt-2 text-[9px] px-2 py-0.5 rounded-full font-medium ${sourceColors[lead.source] ?? "bg-gray-100 text-gray-500"}`}>
-                              {lead.source}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         )}
 
         {/* ── CLIENTS ── */}
@@ -423,9 +292,6 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
           </div>
         )}
 
-        {/* ── MARKETING ── */}
-        {activeTab === "Marketing" && <MarketingTab />}
-
         {/* ── DOCUMENTS ── */}
         {activeTab === "Documents" && (
           <div className="space-y-6">
@@ -474,7 +340,7 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
                     onDragLeave={() => setDocDragOver(false)}
                     onDrop={(e) => { e.preventDefault(); setDocDragOver(false); const f = e.dataTransfer.files[0]; if (f) setDocFile(f); }}
                     onClick={() => docFileRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors flex-1 flex flex-col items-center justify-center ${
+                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors flex flex-col items-center justify-center min-h-40 ${
                       docDragOver ? "border-[#C9A84C] bg-[#C9A84C]/5"
                       : docFile ? "border-green-400 bg-green-50"
                       : "border-gray-200 hover:border-[#C9A84C] hover:bg-[#C9A84C]/5"
@@ -518,125 +384,6 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
         )}
 
       </div>
-
-      {/* Lead Detail Panel */}
-      {selectedLead && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-end" onClick={() => setSelectedLead(null)}>
-          <div className="bg-white w-full max-w-md h-full overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-[#0A1628] px-6 py-5 flex items-center justify-between">
-              <div>
-                <p className="text-white font-medium">{selectedLead.name}</p>
-                <p className="text-slate-400 text-xs mt-0.5">{selectedLead.assigned_to ?? "Unassigned"}</p>
-              </div>
-              <button onClick={() => setSelectedLead(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-2">Stage</label>
-                <div className="flex flex-wrap gap-2">
-                  {STAGES.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => handleStageChange(selectedLead, s)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        selectedLead.stage === s
-                          ? "bg-[#C9A84C] text-[#0A1628]"
-                          : "bg-gray-100 text-slate-500 hover:bg-gray-200"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {[
-                  { label: "Email", value: selectedLead.email ?? "—" },
-                  { label: "Phone", value: selectedLead.phone ?? "—" },
-                  { label: "Source", value: selectedLead.source },
-                  { label: "Potential Premium", value: selectedLead.potential_premium > 0 ? fmt(selectedLead.potential_premium) + "/yr" : "—" },
-                ].map((row) => (
-                  <div key={row.label}>
-                    <p className="text-slate-400 text-[10px] uppercase tracking-widest mb-1">{row.label}</p>
-                    <p className="text-[#0A1628] font-medium">{row.value}</p>
-                  </div>
-                ))}
-              </div>
-              {selectedLead.notes && (
-                <div>
-                  <p className="text-slate-400 text-[10px] uppercase tracking-widest mb-2">Notes</p>
-                  <p className="text-slate-600 text-sm leading-relaxed bg-gray-50 rounded-xl p-4">{selectedLead.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Lead Modal */}
-      {showAddLead && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAddLead(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[#0A1628] font-medium text-lg mb-5">Add New Lead</h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Name *</label>
-                  <input value={newLead.name} onChange={(e) => setNewLead(p => ({ ...p, name: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C]" placeholder="Full name" />
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Email</label>
-                  <input value={newLead.email} onChange={(e) => setNewLead(p => ({ ...p, email: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C]" placeholder="email@example.com" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Phone</label>
-                  <input value={newLead.phone} onChange={(e) => setNewLead(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C]" placeholder="(801) 555-0000" />
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Annual Premium</label>
-                  <input value={newLead.potential_premium} onChange={(e) => setNewLead(p => ({ ...p, potential_premium: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C]" placeholder="12000" type="number" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Source</label>
-                  <select value={newLead.source} onChange={(e) => setNewLead(p => ({ ...p, source: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C]">
-                    {["Referral", "Website", "Event", "Cold Outreach", "Other"].map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Assigned To</label>
-                  <select value={newLead.assigned_to} onChange={(e) => setNewLead(p => ({ ...p, assigned_to: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C]">
-                    <option value="">Select advisor…</option>
-                    {["Stephen Mongie", "Samuel Noel", "Zach McGlothin"].map((a) => <option key={a}>{a}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase tracking-widest mb-1.5">Notes</label>
-                <textarea value={newLead.notes} onChange={(e) => setNewLead(p => ({ ...p, notes: e.target.value }))}
-                  rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C9A84C] resize-none" placeholder="Context, referral source, products of interest…" />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowAddLead(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-slate-500 text-xs font-medium hover:bg-gray-50">Cancel</button>
-              <button onClick={handleAddLead} disabled={!newLead.name || addingLead}
-                className="flex-1 py-2.5 bg-[#C9A84C] hover:bg-[#E8C96C] text-[#0A1628] rounded-xl text-xs font-semibold uppercase tracking-widest disabled:opacity-50 transition-colors">
-                {addingLead ? "Adding…" : "Add Lead"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
