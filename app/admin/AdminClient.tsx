@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import MarketingTab from "./MarketingTab";
 
 // ── Static client display data ──────────────────────────────
 const clientRows = [
@@ -69,7 +70,7 @@ function fmtSize(bytes: number) {
 
 export default function AdminClient({ adminEmail }: { adminEmail: string }) {
   const [activeTab, setActiveTab] = useState("Overview");
-  const tabs = ["Overview", "Pipeline", "Clients", "Deal Interests", "Documents"];
+  const tabs = ["Overview", "Pipeline", "Clients", "Deal Interests", "Marketing", "Documents"];
 
   // Pipeline state
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -511,6 +512,9 @@ export default function AdminClient({ adminEmail }: { adminEmail: string }) {
             )}
           </div>
         )}
+
+        {/* ── MARKETING ── */}
+        {activeTab === "Marketing" && <MarketingTab />}
 
         {/* ── DOCUMENTS ── */}
         {activeTab === "Documents" && (
