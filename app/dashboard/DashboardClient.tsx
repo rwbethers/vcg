@@ -506,6 +506,7 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
           {activeNav === "Documents" && (
             <DocumentsSection
               documents={documents}
+              policies={policies}
               clientId={client.id}
               clientName={client.name}
             />
