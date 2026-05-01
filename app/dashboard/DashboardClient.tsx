@@ -4,6 +4,7 @@ import CashValueSection from "./CashValueSection";
 import TaxStrategySection from "./TaxStrategySection";
 import ContactAdvisorSection from "./ContactAdvisorSection";
 import PrivateMarketsSection from "./PrivateMarketsSection";
+import DocumentsSection from "./DocumentsSection";
 
 interface Client {
   id: string;
@@ -64,11 +65,23 @@ interface Deal {
   image_url: string;
 }
 
+interface Document {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  category: string;
+  uploaded_by: string;
+  created_at: string;
+}
+
 interface Props {
   client: Client;
   policies: Policy[];
   actionItems: ActionItem[];
   deals: Deal[];
+  documents: Document[];
 }
 
 const statusColors: Record<string, string> = {
@@ -121,7 +134,7 @@ const sectionTitles: Record<string, { title: string; sub: string }> = {
   "Contact Advisor": { title: "Contact Your Advisor", sub: "Reach out to your Vision Consulting Group team" },
 };
 
-export default function DashboardClient({ client, policies, actionItems, deals }: Props) {
+export default function DashboardClient({ client, policies, actionItems, deals, documents }: Props) {
   const [activeNav, setActiveNav] = useState("Overview");
 
   const activePolicies = policies.filter((p) => p.status === "Active");
@@ -489,23 +502,13 @@ export default function DashboardClient({ client, policies, actionItems, deals }
             <ContactAdvisorSection advisorName={client.advisor} clientName={client.name} />
           )}
 
-          {/* ── COMING SOON ── */}
-          {["Documents"].includes(activeNav) && (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-16 h-16 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/30 flex items-center justify-center mb-5">
-                <span className="text-[#C9A84C] text-2xl">
-                  {navItems.find(n => n.label === activeNav)?.icon}
-                </span>
-              </div>
-              <h3 className="text-[#0A1628] text-lg font-light mb-2">{activeNav}</h3>
-              <p className="text-slate-400 text-sm">This section is coming soon. Contact your advisor for more information.</p>
-              <button
-                onClick={() => setActiveNav("Contact Advisor")}
-                className="mt-6 bg-[#C9A84C] hover:bg-[#E8C96C] text-[#0A1628] text-xs font-semibold px-6 py-3 rounded-lg tracking-widest uppercase transition-colors"
-              >
-                Contact Advisor
-              </button>
-            </div>
+          {/* ── DOCUMENTS ── */}
+          {activeNav === "Documents" && (
+            <DocumentsSection
+              documents={documents}
+              clientId={client.id}
+              clientName={client.name}
+            />
           )}
 
         </div>

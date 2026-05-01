@@ -37,12 +37,19 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at");
 
+  const { data: documents } = await supabase
+    .from("documents")
+    .select("*")
+    .eq("client_id", clientData.id)
+    .order("created_at", { ascending: false });
+
   return (
     <DashboardClient
       client={clientData}
       policies={policies ?? []}
       actionItems={actionItems ?? []}
       deals={deals ?? []}
+      documents={documents ?? []}
     />
   );
 }
