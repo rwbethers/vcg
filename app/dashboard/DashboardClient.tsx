@@ -3,6 +3,7 @@ import { useState } from "react";
 import CashValueSection from "./CashValueSection";
 import TaxStrategySection from "./TaxStrategySection";
 import ContactAdvisorSection from "./ContactAdvisorSection";
+import PrivateMarketsSection from "./PrivateMarketsSection";
 
 interface Client {
   id: string;
@@ -48,10 +49,26 @@ interface ActionItem {
   completed: boolean;
 }
 
+interface Deal {
+  id: string;
+  title: string;
+  asset_class: string;
+  description: string;
+  target_return: string;
+  minimum_investment: number;
+  term: string;
+  status: string;
+  location: string;
+  sponsor: string;
+  highlights: string[];
+  image_url: string;
+}
+
 interface Props {
   client: Client;
   policies: Policy[];
   actionItems: ActionItem[];
+  deals: Deal[];
 }
 
 const statusColors: Record<string, string> = {
@@ -81,6 +98,7 @@ const navItems = [
   { label: "Policies", icon: "◈" },
   { label: "Cash Value", icon: "◎" },
   { label: "Tax Strategy", icon: "⟁" },
+  { label: "Private Markets", icon: "◉" },
   { label: "Documents", icon: "⊟" },
   { label: "Contact Advisor", icon: "◇" },
 ];
@@ -98,11 +116,12 @@ const sectionTitles: Record<string, { title: string; sub: string }> = {
   Policies: { title: "My Policies", sub: "Full detail on each insurance policy in your portfolio" },
   "Cash Value": { title: "Cash Value", sub: "Tax-deferred growth and available liquidity" },
   "Tax Strategy": { title: "Tax Strategy", sub: "How your portfolio is structured to minimize taxes" },
+  "Private Markets": { title: "Private Markets", sub: "Exclusive investment opportunities curated for VCG clients" },
   Documents: { title: "Documents", sub: "Statements, illustrations, and policy documents" },
   "Contact Advisor": { title: "Contact Your Advisor", sub: "Reach out to your Vision Consulting Group team" },
 };
 
-export default function DashboardClient({ client, policies, actionItems }: Props) {
+export default function DashboardClient({ client, policies, actionItems, deals }: Props) {
   const [activeNav, setActiveNav] = useState("Overview");
 
   const activePolicies = policies.filter((p) => p.status === "Active");
@@ -456,12 +475,21 @@ export default function DashboardClient({ client, policies, actionItems }: Props
             <TaxStrategySection policies={policies} clientName={client.name} />
           )}
 
+          {/* ── PRIVATE MARKETS ── */}
+          {activeNav === "Private Markets" && (
+            <PrivateMarketsSection
+              deals={deals}
+              clientId={client.id}
+              clientName={client.name}
+            />
+          )}
+
           {/* ── CONTACT ADVISOR ── */}
           {activeNav === "Contact Advisor" && (
             <ContactAdvisorSection advisorName={client.advisor} clientName={client.name} />
           )}
 
-          {/* ── COMING SOON SECTIONS ── */}
+          {/* ── COMING SOON ── */}
           {["Documents"].includes(activeNav) && (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="w-16 h-16 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/30 flex items-center justify-center mb-5">

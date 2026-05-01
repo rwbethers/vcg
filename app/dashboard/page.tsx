@@ -32,11 +32,17 @@ export default async function DashboardPage() {
     .eq("completed", false)
     .order("due_date");
 
+  const { data: deals } = await supabase
+    .from("deals")
+    .select("*")
+    .order("created_at");
+
   return (
     <DashboardClient
       client={clientData}
       policies={policies ?? []}
       actionItems={actionItems ?? []}
+      deals={deals ?? []}
     />
   );
 }
