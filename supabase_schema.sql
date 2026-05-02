@@ -332,3 +332,37 @@ insert into action_items (client_id, label, due_date, priority) values
    'Review loan balance on Penn 8292468', '2026-05-01', 'high'),
   ((select id from clients where email = 'tauvaa@vcgclient.com'),
    'Term policy review — conversion options', '2026-06-19', 'normal');
+
+-- ============================================================
+-- PRIVATE MARKETS — Deal listings and interest tracking
+-- ============================================================
+
+create table if not exists deals (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  asset_class text not null,     -- Real Estate, Private Equity, Private Credit, Equities
+  description text,
+  target_return text,            -- e.g. "12–15% IRR"
+  minimum_investment numeric,
+  term text,                     -- e.g. "5–7 years"
+  status text default 'Accepting Interest',  -- Accepting Interest, Coming Soon, Closed
+  location text,
+  sponsor text,
+  highlights text[],
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists deal_interest (
+  id uuid default gen_random_uuid() primary key,
+  deal_id uuid references deals(id) on delete cascade,
+  client_id uuid references clients(id) on delete cascade,
+  client_email text,
+  client_name text,
+  created_at timestamp with time zone default now(),
+  unique(deal_id, client_id)
+);
+
+alter table deals disable row level security;
+alter table deal_interest disable row level security;
+grant select, insert, update, delete on deals to anon, authenticated;
+grant select, insert, update, delete on deal_interest to anon, authenticated;

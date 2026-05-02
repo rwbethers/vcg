@@ -3,6 +3,15 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import OverviewTab from "./OverviewTab";
+import ActionItemsTab from "./ActionItemsTab";
+import ClientDetailPanel from "./ClientDetailPanel";
+import DealManagerTab from "./DealManagerTab";
+import AnnouncementsTab from "./AnnouncementsTab";
+import ActivityFeedTab from "./ActivityFeedTab";
+import OnboardingTab from "./OnboardingTab";
+import ReportsTab from "./ReportsTab";
+import ClientHealthTab from "./ClientHealthTab";
+import PipelineTab from "./PipelineTab";
 
 const clientRows = [
   { name: "Jeffrey Adams",       type: "Individual",         advisor: "Stephen Mongie", deathBenefit: "$2,615,225", cashValue: "$136,016", premiums: "$15,000", policies: 2, products: "Whole Life, Term",       status: "Active" },
@@ -26,8 +35,60 @@ interface DealInterest {
   created_at: string;
 }
 
-interface SupabaseClient { id: string; name: string; }
+interface SupabaseClient {
+  id: string;
+  name: string;
+  email: string;
+  type: string;
+  advisor: string;
+  member_since: string;
+  state: string;
+  stage?: string;
+  created_at?: string;
+}
+
+interface ActionItem {
+  id: string;
+  client_id: string;
+  label: string;
+  due_date: string;
+  priority: string;
+  completed: boolean;
+  clients?: { name: string };
+}
+
+interface Deal {
+  id: string;
+  title: string;
+  asset_class: string;
+  description: string;
+  target_return: string;
+  minimum_investment: number;
+  term: string;
+  status: string;
+  location: string;
+  sponsor: string;
+  image_url: string;
+}
+
+interface Announcement {
+  id: string;
+  message: string;
+  type: string;
+  active: boolean;
+  created_at: string;
+}
+
 interface Goal { id: string; metric: string; target: number; period: string; }
+
+interface Props {
+  adminEmail: string;
+  goals: Goal[];
+  clients: SupabaseClient[];
+  actionItems: ActionItem[];
+  deals: Deal[];
+  announcements: Announcement[];
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -37,16 +98,16 @@ function fmtSize(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export default function AdminClient({ adminEmail, goals: initialGoals }: { adminEmail: string; goals: Goal[] }) {
+export default function AdminClient({ adminEmail, goals: initialGoals, clients, actionItems, deals, announcements }: Props) {
   const [activeTab, setActiveTab] = useState("Overview");
-  const tabs = ["Overview", "Clients", "Deal Interests", "Documents"];
+  const tabs = ["Overview", "Pipeline", "Clients", "Deal Interests", "Documents", "Action Items", "Deal Manager", "Announcements", "Activity", "Onboarding", "Reports", "Client Health"];
 
   const [dealInterests, setDealInterests] = useState<DealInterest[]>([]);
-  const [supabaseClients, setSupabaseClients] = useState<SupabaseClient[]>([]);
 
   // Clients tab
   const [search, setSearch] = useState("");
   const [filterAdvisor, setFilterAdvisor] = useState("All");
+  const [panelClient, setPanelClient] = useState<SupabaseClient | null>(null);
 
   // Documents tab
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -61,9 +122,6 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
     const supabase = createClient();
     supabase.from("deal_interest").select("*").order("created_at", { ascending: false }).then(({ data }) => {
       if (data) setDealInterests(data);
-    });
-    supabase.from("clients").select("id, name").order("name").then(({ data }) => {
-      if (data) setSupabaseClients(data);
     });
   }, []);
 
@@ -100,6 +158,11 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
     setTimeout(() => setUploadResult(null), 4000);
   };
 
+  const openClientPanel = (rowName: string) => {
+    const match = clients.find((c) => c.name === rowName);
+    if (match) setPanelClient(match);
+  };
+
   return (
     <div className="min-h-screen bg-[#F4F5F7]">
 
@@ -130,13 +193,13 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
       </header>
 
       {/* Tab Nav */}
-      <div className="bg-[#0d1e3a] border-b border-[#1a3060] px-8">
-        <div className="flex gap-1">
+      <div className="bg-[#0d1e3a] border-b border-[#1a3060] px-8 overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
           {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3.5 text-xs font-medium transition-all relative ${
+              className={`px-5 py-3.5 text-xs font-medium transition-all relative whitespace-nowrap ${
                 activeTab === tab ? "text-[#C9A84C]" : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -163,12 +226,17 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
           />
         )}
 
+        {/* ── PIPELINE ── */}
+        {activeTab === "Pipeline" && (
+          <PipelineTab clients={clients.map(c => ({ ...c, stage: c.stage ?? "client" }))} />
+        )}
+
         {/* ── CLIENTS ── */}
         {activeTab === "Clients" && (
           <div className="space-y-6">
             <div>
               <h1 className="text-2xl font-light text-[#0A1628]">Client Accounts</h1>
-              <p className="text-slate-400 text-sm mt-1">All active client accounts and portfolio metrics</p>
+              <p className="text-slate-400 text-sm mt-1">All active client accounts and portfolio metrics — click any row for full details</p>
             </div>
             <div className="flex items-center gap-4">
               <input
@@ -207,7 +275,11 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map((c) => (
-                    <tr key={c.name} className="hover:bg-[#FAFBFC] transition-colors">
+                    <tr
+                      key={c.name}
+                      onClick={() => openClientPanel(c.name)}
+                      className="hover:bg-[#FAFBFC] transition-colors cursor-pointer"
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-[#0A1628] flex items-center justify-center flex-shrink-0">
@@ -310,7 +382,7 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-[#C9A84C] transition-colors"
                     >
                       <option value="">Select a client…</option>
-                      {supabaseClients.map((c) => (
+                      {clients.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
@@ -383,7 +455,47 @@ export default function AdminClient({ adminEmail, goals: initialGoals }: { admin
           </div>
         )}
 
+        {/* ── ACTION ITEMS ── */}
+        {activeTab === "Action Items" && (
+          <ActionItemsTab actionItems={actionItems} clients={clients} />
+        )}
+
+        {/* ── DEAL MANAGER ── */}
+        {activeTab === "Deal Manager" && (
+          <DealManagerTab deals={deals} />
+        )}
+
+        {/* ── ANNOUNCEMENTS ── */}
+        {activeTab === "Announcements" && (
+          <AnnouncementsTab announcements={announcements} />
+        )}
+
+        {/* ── ACTIVITY ── */}
+        {activeTab === "Activity" && (
+          <ActivityFeedTab />
+        )}
+
+        {/* ── ONBOARDING ── */}
+        {activeTab === "Onboarding" && (
+          <OnboardingTab />
+        )}
+
+        {/* ── REPORTS ── */}
+        {activeTab === "Reports" && (
+          <ReportsTab clients={clients} deals={deals} actionItems={actionItems} />
+        )}
+
+        {/* ── CLIENT HEALTH ── */}
+        {activeTab === "Client Health" && (
+          <ClientHealthTab clients={clients} actionItems={actionItems} />
+        )}
+
       </div>
+
+      {/* Client Detail Panel */}
+      {panelClient && (
+        <ClientDetailPanel client={panelClient} onClose={() => setPanelClient(null)} />
+      )}
     </div>
   );
 }

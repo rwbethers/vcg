@@ -5,6 +5,7 @@ import TaxStrategySection from "./TaxStrategySection";
 import ContactAdvisorSection from "./ContactAdvisorSection";
 import PrivateMarketsSection from "./PrivateMarketsSection";
 import DocumentsSection from "./DocumentsSection";
+import RefinanceSection from "./RefinanceSection";
 
 interface Client {
   id: string;
@@ -76,12 +77,34 @@ interface Document {
   created_at: string;
 }
 
+interface Announcement {
+  id: string;
+  message: string;
+  type: string;
+}
+
+interface Illustration {
+  id: string;
+  prospect_name: string;
+  carrier: string;
+  product_name: string;
+  advisor_name: string;
+  issue_age: number;
+  face_amount: number;
+  annual_prem: number;
+  prem_years: number;
+  illustrated_rate: number;
+  created_at: string;
+}
+
 interface Props {
   client: Client;
   policies: Policy[];
   actionItems: ActionItem[];
   deals: Deal[];
   documents: Document[];
+  announcement: Announcement | null;
+  illustration: Illustration | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -109,6 +132,8 @@ const fmtPayUp = (d: string | null) => {
 const navItems = [
   { label: "Overview", icon: "▦" },
   { label: "Policies", icon: "◈" },
+  { label: "Projections", icon: "◑" },
+  { label: "Refinance", icon: "⟲" },
   { label: "Cash Value", icon: "◎" },
   { label: "Tax Strategy", icon: "⟁" },
   { label: "Private Markets", icon: "◉" },
@@ -127,6 +152,8 @@ const highlights = [
 const sectionTitles: Record<string, { title: string; sub: string }> = {
   Overview: { title: "Portfolio Overview", sub: "Values sourced from carrier statements · All values in USD" },
   Policies: { title: "My Policies", sub: "Full detail on each insurance policy in your portfolio" },
+  Projections: { title: "Policy Projections", sub: "Interactive illustration — adjust rate and year to model different scenarios" },
+  Refinance: { title: "Loan Refinance", sub: "Model refinancing scenarios for your policy loans" },
   "Cash Value": { title: "Cash Value", sub: "Tax-deferred growth and available liquidity" },
   "Tax Strategy": { title: "Tax Strategy", sub: "How your portfolio is structured to minimize taxes" },
   "Private Markets": { title: "Private Markets", sub: "Exclusive investment opportunities curated for VCG clients" },
@@ -134,8 +161,52 @@ const sectionTitles: Record<string, { title: string; sub: string }> = {
   "Contact Advisor": { title: "Contact Your Advisor", sub: "Reach out to your Vision Consulting Group team" },
 };
 
-export default function DashboardClient({ client, policies, actionItems, deals, documents }: Props) {
+const announcementStyles: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+  info:    { bg: "bg-blue-50",   text: "text-blue-700",  border: "border-blue-200",  icon: "ℹ️" },
+  success: { bg: "bg-green-50",  text: "text-green-700", border: "border-green-200", icon: "✓" },
+  warning: { bg: "bg-amber-50",  text: "text-amber-700", border: "border-amber-200", icon: "⚠" },
+};
+
+function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  const style = announcementStyles[announcement.type] ?? announcementStyles.info;
+  return (
+    <div className={`mx-8 mt-4 ${style.bg} ${style.border} border rounded-xl px-5 py-3.5 flex items-center gap-3`}>
+      <span className="text-lg flex-shrink-0">{style.icon}</span>
+      <p className={`${style.text} text-sm flex-1`}>{announcement.message}</p>
+      <button onClick={() => setDismissed(true)} className={`${style.text} opacity-50 hover:opacity-100 text-lg leading-none flex-shrink-0`}>×</button>
+    </div>
+  );
+}
+
+export default function DashboardClient({ client, policies, actionItems, deals, documents, announcement, illustration }: Props) {
   const [activeNav, setActiveNav] = useState("Overview");
+
+  const illustrationConfig = illustration ? {
+    name: client.name,
+    product: illustration.product_name,
+    carrier: illustration.carrier,
+    advisor: illustration.advisor_name,
+    issueAge: illustration.issue_age,
+    faceAmount: illustration.face_amount,
+    annualPrem: illustration.annual_prem,
+    premYears: illustration.prem_years,
+    illustratedRate: Number(illustration.illustrated_rate),
+    date: new Date(illustration.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+  } : {
+    name: client.name,
+    product: "Lincoln OptiBlend Fixed Indexed UL",
+    carrier: "Lincoln Financial",
+    advisor: client.advisor,
+    issueAge: 40,
+    faceAmount: 2000000,
+    annualPrem: 25000,
+    premYears: 7,
+    illustratedRate: 7.0,
+    date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+  };
+  const illustrationUrl = `/illustration-viewer.html?c=${btoa(JSON.stringify(illustrationConfig))}`;
 
   const activePolicies = policies.filter((p) => p.status === "Active");
   const totalDeathBenefit = activePolicies.reduce((s, p) => s + (p.death_benefit ?? 0), 0);
@@ -228,6 +299,11 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
             {activePolicies.length} Active {activePolicies.length === 1 ? "Policy" : "Policies"}
           </span>
         </div>
+
+        {/* Announcement Banner */}
+        {announcement && (
+          <AnnouncementBanner announcement={announcement} />
+        )}
 
         <div className="px-8 py-8 space-y-8">
 
@@ -476,6 +552,34 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
                 </div>
               ))}
             </div>
+          )}
+
+          {/* ── PROJECTIONS ── */}
+          {activeNav === "Projections" && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ height: "760px" }}>
+                <iframe
+                  src={illustrationUrl}
+                  className="w-full h-full border-0"
+                  title="Policy Illustration"
+                />
+              </div>
+              <p className="text-slate-400 text-[10px] text-center">
+                {illustration
+                  ? `Illustration prepared by ${illustration.advisor_name} · ${illustration.carrier} ${illustration.product_name}`
+                  : "Sample illustration — contact your advisor for a plan specific to your situation"}
+              </p>
+            </div>
+          )}
+
+          {/* ── REFINANCE ── */}
+          {activeNav === "Refinance" && (
+            <RefinanceSection
+              policies={policies}
+              clientId={client.id}
+              clientName={client.name}
+              advisorName={client.advisor}
+            />
           )}
 
           {/* ── CASH VALUE ── */}

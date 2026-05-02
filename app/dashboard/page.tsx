@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import DashboardClient from "./DashboardClient";
+import ProspectDashboard from "./ProspectDashboard";
+import UnderwritingDashboard from "./UnderwritingDashboard";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -19,29 +21,25 @@ export default async function DashboardPage() {
 
   if (!clientData) redirect("/");
 
-  const { data: policies } = await supabase
-    .from("policies")
-    .select("*")
-    .eq("client_id", clientData.id)
-    .order("issue_date");
+  const stage = clientData.stage ?? "client";
 
-  const { data: actionItems } = await supabase
-    .from("action_items")
-    .select("*")
-    .eq("client_id", clientData.id)
-    .eq("completed", false)
-    .order("due_date");
+  if (stage === "prospect") {
+    return <ProspectDashboard client={clientData} />;
+  }
 
-  const { data: deals } = await supabase
-    .from("deals")
-    .select("*")
-    .order("created_at");
+  if (stage === "underwriting") {
+    return <UnderwritingDashboard client={clientData} />;
+  }
 
-  const { data: documents } = await supabase
-    .from("documents")
-    .select("*")
-    .eq("client_id", clientData.id)
-    .order("created_at", { ascending: false });
+  const [{ data: policies }, { data: actionItems }, { data: deals }, { data: documents }, { data: announcements }, { data: illustrations }] =
+    await Promise.all([
+      supabase.from("policies").select("*").eq("client_id", clientData.id).order("issue_date"),
+      supabase.from("action_items").select("*").eq("client_id", clientData.id).eq("completed", false).order("due_date"),
+      supabase.from("deals").select("*").order("created_at"),
+      supabase.from("documents").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
+      supabase.from("announcements").select("*").eq("active", true).order("created_at", { ascending: false }).limit(1),
+      supabase.from("illustrations").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }).limit(1),
+    ]);
 
   return (
     <DashboardClient
@@ -50,6 +48,8 @@ export default async function DashboardPage() {
       actionItems={actionItems ?? []}
       deals={deals ?? []}
       documents={documents ?? []}
+      announcement={announcements?.[0] ?? null}
+      illustration={illustrations?.[0] ?? null}
     />
   );
 }

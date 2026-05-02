@@ -167,5 +167,5 @@ insert into deals (title, asset_class, description, target_return, minimum_inves
   'United States',
   'Vision Capital Group',
   array['Quarterly dividend income paid to account','Companies with 10+ years dividend growth','Lower volatility than broad market','ESG screening available on request'],
-  'https://images.unsplash.com/photo-1642790551116-18a150d975f6?w=800&q=80'
+  'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&q=80'
 );
