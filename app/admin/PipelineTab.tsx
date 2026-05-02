@@ -112,22 +112,26 @@ export default function PipelineTab({ clients: initialClients }: { clients: Clie
     }));
   };
 
-  const advanceStage = async (client: Client) => {
-    const nextStage = client.stage === "prospect" ? "underwriting" : "client";
+  const moveToStage = async (client: Client, newStage: string) => {
+    if (client.stage === newStage) return;
     setSaving(true);
     const supabase = createClient();
-    await supabase.from("clients").update({ stage: nextStage }).eq("id", client.id);
+    await supabase.from("clients").update({ stage: newStage }).eq("id", client.id);
 
-    if (nextStage === "underwriting") {
-      const newTasks = UNDERWRITING_TASKS.map(t => ({ ...t, client_id: client.id, completed: false }));
-      const { data } = await supabase.from("underwriting_tasks").insert(newTasks).select();
-      if (data) {
-        setTasks(prev => ({ ...prev, [client.id]: [...(prev[client.id] ?? []), ...data] }));
+    if (newStage === "underwriting") {
+      const existing = tasks[client.id] ?? [];
+      const hasUnderwriting = existing.some(t => t.category === "Application");
+      if (!hasUnderwriting) {
+        const newTasks = UNDERWRITING_TASKS.map(t => ({ ...t, client_id: client.id, completed: false }));
+        const { data } = await supabase.from("underwriting_tasks").insert(newTasks).select();
+        if (data) {
+          setTasks(prev => ({ ...prev, [client.id]: [...(prev[client.id] ?? []), ...data] }));
+        }
       }
     }
 
-    setClients(prev => prev.map(c => c.id === client.id ? { ...c, stage: nextStage } : c));
-    setPanel(prev => prev?.id === client.id ? { ...prev, stage: nextStage } : prev);
+    setClients(prev => prev.map(c => c.id === client.id ? { ...c, stage: newStage } : c));
+    setPanel(prev => prev?.id === client.id ? { ...prev, stage: newStage } : prev);
     setSaving(false);
   };
 
@@ -346,20 +350,29 @@ export default function PipelineTab({ clients: initialClients }: { clients: Clie
               )}
             </div>
 
-            {/* Advance stage */}
-            {panel.stage !== "client" && (
-              <div className="p-5 border-t border-gray-100 flex-shrink-0">
-                <button onClick={() => advanceStage(panel)} disabled={saving}
-                  className="w-full py-3 bg-[#0A1628] hover:bg-[#0d1e3a] text-white rounded-xl text-xs font-semibold uppercase tracking-widest disabled:opacity-50 transition-colors">
-                  {saving ? "Moving…" : panel.stage === "prospect" ? "Move to Underwriting →" : "Activate as Client →"}
-                </button>
-                <p className="text-slate-400 text-[10px] text-center mt-2">
-                  {panel.stage === "prospect"
-                    ? "Creates underwriting checklist and updates portal access"
-                    : "Grants full portal access — complete checklist first"}
-                </p>
+            {/* Stage selector */}
+            <div className="p-5 border-t border-gray-100 flex-shrink-0">
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-3">Move to Stage</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["prospect", "underwriting", "client"] as const).map(stage => {
+                  const cfg = stageConfig[stage];
+                  const isActive = panel.stage === stage;
+                  return (
+                    <button key={stage} onClick={() => moveToStage(panel, stage)} disabled={saving || isActive}
+                      className={`py-2.5 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border ${
+                        isActive
+                          ? `${cfg.bg} ${cfg.color} ${cfg.border} cursor-default`
+                          : "bg-gray-50 text-slate-400 border-gray-100 hover:border-[#C9A84C] hover:text-[#0A1628]"
+                      }`}>
+                      {isActive ? "✓ " : ""}{cfg.label}
+                    </button>
+                  );
+                })}
               </div>
-            )}
+              <p className="text-slate-400 text-[10px] text-center mt-2">
+                {saving ? "Updating…" : "Changes portal access immediately"}
+              </p>
+            </div>
           </div>
         </div>
       )}
