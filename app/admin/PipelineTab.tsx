@@ -152,6 +152,13 @@ export default function PipelineTab({ clients: initialClients }: { clients: Clie
       const { data: taskData } = await supabase.from("underwriting_tasks").insert(newTasks).select();
       if (taskData) setTasks(prev => ({ ...prev, [data.id]: taskData }));
       setClients(prev => [data, ...prev]);
+
+      // Send portal invite email
+      await fetch("/api/invite-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: addForm.email, name: addForm.name }),
+      });
     }
     setAddForm({ name: "", email: "", advisor: "Stephen Mongie", type: "Individual" });
     setShowAdd(false);
