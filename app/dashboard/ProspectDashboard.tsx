@@ -6,6 +6,8 @@ import ProspectTaxCalc from "./ProspectTaxCalc";
 import ProspectWealthScore from "./ProspectWealthScore";
 import ProspectCaseStudies from "./ProspectCaseStudies";
 import ProspectWealthAudit from "./ProspectWealthAudit";
+import ProspectPolicyReviews from "./ProspectPolicyReviews";
+import ProspectQuarterlyDeck from "./ProspectQuarterlyDeck";
 
 interface Client {
   id: string;
@@ -16,6 +18,7 @@ interface Client {
 
 interface Props {
   client: Client;
+  isAdminPreview?: boolean;
 }
 
 const advisorEmails: Record<string, string> = {
@@ -25,16 +28,16 @@ const advisorEmails: Record<string, string> = {
 };
 
 const navItems = [
-  { key: "illustration", label: "My Illustration",    icon: "◑", sub: "Your personalized projection" },
-  { key: "score",        label: "Wealth Score",        icon: "◎", sub: "See where you stand" },
+  { key: "illustration", label: "My Dashboard",        icon: "◑", sub: "Your personalized projection" },
   { key: "gap",          label: "Coverage Gap",        icon: "◈", sub: "How much are you missing?" },
   { key: "waiting",      label: "Cost of Waiting",     icon: "⟲", sub: "What delay costs you" },
   { key: "tax",          label: "Tax Analysis",        icon: "⟁", sub: "What taxes take from you" },
   { key: "audit",        label: "Wealth Audit",        icon: "▦", sub: "Protected vs exposed" },
-  { key: "stories",      label: "Client Stories",      icon: "◉", sub: "Real outcomes" },
+  { key: "reviews",      label: "Policy Reviews",      icon: "◎", sub: "Weekly & monthly updates" },
+  { key: "quarterly",   label: "Quarterly Report",    icon: "◈", sub: "Your advisor's quarterly deck" },
 ];
 
-export default function ProspectDashboard({ client }: Props) {
+export default function ProspectDashboard({ client, isAdminPreview = false }: Props) {
   const [activeNav, setActiveNav] = useState("illustration");
   const [contactSent, setContactSent] = useState(false);
 
@@ -64,15 +67,9 @@ export default function ProspectDashboard({ client }: Props) {
 
       {/* Sidebar */}
       <aside className="w-64 bg-[#0A1628] flex flex-col flex-shrink-0">
-        <div className="px-6 py-8 border-b border-[#1a3060]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 border border-[#C9A84C] rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-[#C9A84C] text-sm font-light">V</span>
-            </div>
-            <div>
-              <div className="text-white text-sm font-light tracking-[0.15em] uppercase">Vision</div>
-              <div className="text-[#C9A84C] text-[9px] tracking-[0.3em] uppercase">Consulting Group</div>
-            </div>
+        <div className="px-5 py-5 border-b border-[#1a3060]">
+          <div className="bg-white rounded-xl px-4 py-3 inline-block">
+            <img src="/vcg-logo.png" alt="Vision Consulting Group" className="h-8 w-auto" />
           </div>
         </div>
 
@@ -129,11 +126,17 @@ export default function ProspectDashboard({ client }: Props) {
               Schedule a Call
             </button>
           )}
-          <form action="/auth/signout" method="POST">
-            <button type="submit" className="w-full text-slate-600 text-[10px] hover:text-slate-400 transition-colors">
-              ← Sign out
-            </button>
-          </form>
+          {isAdminPreview ? (
+            <a href="/admin" className="block w-full text-center text-[#C9A84C] text-[10px] hover:text-[#E8C96C] transition-colors">
+              ← Exit Admin Preview
+            </a>
+          ) : (
+            <form action="/auth/signout" method="POST">
+              <button type="submit" className="w-full text-slate-600 text-[10px] hover:text-slate-400 transition-colors">
+                ← Sign out
+              </button>
+            </form>
+          )}
         </div>
       </aside>
 
@@ -180,15 +183,6 @@ export default function ProspectDashboard({ client }: Props) {
             </div>
           )}
 
-          {activeNav === "score" && (
-            <ProspectWealthScore
-              clientId={client.id}
-              clientName={client.name}
-              advisorName={client.advisor}
-              onSchedule={handleSchedule}
-            />
-          )}
-
           {activeNav === "gap" && (
             <ProspectGapCalc onSchedule={handleSchedule} />
           )}
@@ -205,8 +199,17 @@ export default function ProspectDashboard({ client }: Props) {
             <ProspectWealthAudit onSchedule={handleSchedule} />
           )}
 
-          {activeNav === "stories" && (
-            <ProspectCaseStudies onSchedule={handleSchedule} />
+          {activeNav === "reviews" && (
+            <ProspectPolicyReviews clientId={client.id} onSchedule={handleSchedule} />
+          )}
+
+          {activeNav === "quarterly" && (
+            <ProspectQuarterlyDeck
+              clientId={client.id}
+              clientName={client.name}
+              advisorName={client.advisor}
+              onSchedule={handleSchedule}
+            />
           )}
 
         </div>

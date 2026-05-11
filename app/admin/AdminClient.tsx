@@ -6,12 +6,16 @@ import OverviewTab from "./OverviewTab";
 import ActionItemsTab from "./ActionItemsTab";
 import ClientDetailPanel from "./ClientDetailPanel";
 import DealManagerTab from "./DealManagerTab";
-import AnnouncementsTab from "./AnnouncementsTab";
-import ActivityFeedTab from "./ActivityFeedTab";
-import OnboardingTab from "./OnboardingTab";
 import ReportsTab from "./ReportsTab";
 import ClientHealthTab from "./ClientHealthTab";
 import PipelineTab from "./PipelineTab";
+import PolicyReviewTab from "./PolicyReviewTab";
+import QuarterlyDeckTab from "./QuarterlyDeckTab";
+import IllustrationRequestsTab from "./IllustrationRequestsTab";
+import PremiumFinanceTab from "./PremiumFinanceTab";
+import CollateralMonitorTab from "./CollateralMonitorTab";
+import CriticalDatesTab from "./CriticalDatesTab";
+import AIAssistant from "./AIAssistant";
 
 const clientRows = [
   { name: "Jeffrey Adams",       type: "Individual",         advisor: "Stephen Mongie", deathBenefit: "$2,615,225", cashValue: "$136,016", premiums: "$15,000", policies: 2, products: "Whole Life, Term",       status: "Active" },
@@ -100,7 +104,14 @@ function fmtSize(bytes: number) {
 
 export default function AdminClient({ adminEmail, goals: initialGoals, clients, actionItems, deals, announcements }: Props) {
   const [activeTab, setActiveTab] = useState("Overview");
-  const tabs = ["Overview", "Pipeline", "Clients", "Deal Interests", "Documents", "Action Items", "Deal Manager", "Announcements", "Activity", "Onboarding", "Reports", "Client Health"];
+
+  const NAV_GROUPS = [
+    { label: "CLIENTS",     tabs: ["Overview", "Clients", "Pipeline", "Client Health"] },
+    { label: "OPERATIONS",  tabs: ["Illustration Requests", "Policy Reviews", "Quarterly Decks", "Action Items"] },
+    { label: "FINANCE",     tabs: ["Premium Finance", "Collateral Monitor", "Critical Dates"] },
+    { label: "DEALS",       tabs: ["Deal Manager", "Deal Interests"] },
+    { label: "ADMIN",       tabs: ["Documents", "Reports"] },
+  ];
 
   const [dealInterests, setDealInterests] = useState<DealInterest[]>([]);
 
@@ -125,11 +136,28 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
     });
   }, []);
 
+  const financialLookup = Object.fromEntries(clientRows.map((r) => [r.name, r]));
+
   const advisors = ["All", "Stephen Mongie", "Samuel Noel", "Zach McGlothin"];
-  const filtered = clientRows.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) &&
-    (filterAdvisor === "All" || c.advisor === filterAdvisor)
-  );
+  const filtered = clients
+    .filter((c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) &&
+      (filterAdvisor === "All" || c.advisor === filterAdvisor)
+    )
+    .map((c) => {
+      const fin = financialLookup[c.name];
+      return {
+        name: c.name,
+        type: c.type ?? fin?.type ?? "—",
+        advisor: c.advisor ?? fin?.advisor ?? "—",
+        deathBenefit: fin?.deathBenefit ?? "—",
+        cashValue: fin?.cashValue ?? "—",
+        premiums: fin?.premiums ?? "—",
+        policies: fin?.policies ?? 0,
+        products: fin?.products ?? "—",
+        status: fin?.status ?? "Active",
+      };
+    });
 
   const handleDocUpload = async () => {
     if (!docFile || !selectedClientId) return;
@@ -169,14 +197,8 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
       {/* Top Bar */}
       <header className="bg-[#0A1628] px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 border border-[#C9A84C] rounded-full flex items-center justify-center">
-              <span className="text-[#C9A84C] text-xs">V</span>
-            </div>
-            <div>
-              <span className="text-white text-sm font-light tracking-widest uppercase">Vision</span>
-              <span className="text-[#C9A84C] text-[9px] tracking-widest uppercase ml-2">Consulting Group</span>
-            </div>
+          <div className="bg-white rounded-xl px-4 py-2 inline-block">
+            <img src="/vcg-logo.png" alt="Vision Consulting Group" className="h-7 w-auto" />
           </div>
           <span className="text-[#1a3060] text-sm">|</span>
           <span className="text-slate-400 text-sm">Admin Portal</span>
@@ -192,25 +214,43 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
         </div>
       </header>
 
-      {/* Tab Nav */}
-      <div className="bg-[#0d1e3a] border-b border-[#1a3060] px-8 overflow-x-auto">
-        <div className="flex gap-1 min-w-max">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3.5 text-xs font-medium transition-all relative whitespace-nowrap ${
-                activeTab === tab ? "text-[#C9A84C]" : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              {tab}
-              {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C9A84C]" />}
-              {tab === "Deal Interests" && dealInterests.length > 0 && (
-                <span className="ml-1.5 bg-[#C9A84C] text-[#0A1628] text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                  {dealInterests.length}
-                </span>
+      {/* Grouped Tab Nav */}
+      <div className="bg-[#07101f] border-b border-[#0f1f3a] px-6 overflow-x-auto">
+        <div className="flex items-stretch min-w-max">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={group.label} className="flex items-stretch">
+              {/* Group */}
+              <div className="flex flex-col">
+                <span className="text-[#1a3a60] text-[8px] font-bold tracking-[0.2em] uppercase px-4 pt-2.5 pb-0">{group.label}</span>
+                <div className="flex items-stretch gap-0.5 pb-0">
+                  {group.tabs.map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-4 py-2.5 text-[11px] font-medium transition-all relative whitespace-nowrap ${
+                        activeTab === tab
+                          ? "text-[#C9A84C]"
+                          : "text-[#4a6080] hover:text-slate-300"
+                      }`}
+                    >
+                      {tab}
+                      {activeTab === tab && (
+                        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#C9A84C] rounded-t-full" />
+                      )}
+                      {tab === "Deal Interests" && dealInterests.length > 0 && (
+                        <span className="ml-1 bg-[#C9A84C] text-[#0A1628] text-[8px] px-1.5 py-0.5 rounded-full font-bold">
+                          {dealInterests.length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Divider between groups */}
+              {gi < NAV_GROUPS.length - 1 && (
+                <div className="w-px bg-[#0f1f3a] mx-1 self-stretch" />
               )}
-            </button>
+            </div>
           ))}
         </div>
       </div>
@@ -222,6 +262,8 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
           <OverviewTab
             dealInterests={dealInterests}
             goals={initialGoals}
+            clients={clients}
+            actionItems={actionItems}
             onTabChange={setActiveTab}
           />
         )}
@@ -229,6 +271,21 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
         {/* ── PIPELINE ── */}
         {activeTab === "Pipeline" && (
           <PipelineTab clients={clients.map(c => ({ ...c, stage: c.stage ?? "client" }))} />
+        )}
+
+        {/* ── POLICY REVIEWS ── */}
+        {activeTab === "Policy Reviews" && (
+          <PolicyReviewTab clients={clients.map(c => ({ ...c, stage: c.stage ?? "client" }))} adminEmail={adminEmail} />
+        )}
+
+        {/* ── QUARTERLY DECKS ── */}
+        {activeTab === "Quarterly Decks" && (
+          <QuarterlyDeckTab clients={clients.map(c => ({ ...c, stage: c.stage ?? "client" }))} adminEmail={adminEmail} />
+        )}
+
+        {/* ── ILLUSTRATION REQUESTS ── */}
+        {activeTab === "Illustration Requests" && (
+          <IllustrationRequestsTab clients={clients.map(c => ({ ...c, stage: c.stage ?? "client" }))} adminEmail={adminEmail} />
         )}
 
         {/* ── CLIENTS ── */}
@@ -268,7 +325,7 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
               <table className="w-full">
                 <thead>
                   <tr className="bg-[#F4F5F7] border-b border-gray-100">
-                    {["Client", "Type", "Advisor", "Death Benefit", "Cash Value", "Annual Premiums", "Policies", "Products", "Status"].map((h) => (
+                    {["Client", "Type", "Advisor", "Death Benefit", "Cash Value", "Annual Premiums", "Policies", "Products", "Status", ""].map((h) => (
                       <th key={h} className="text-left px-6 py-3 text-[10px] uppercase tracking-widest text-slate-400 font-medium whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -305,6 +362,21 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
                         }`}>
                           {c.status}
                         </span>
+                      </td>
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const sc = clients.find((x) => x.name === c.name);
+                          return sc ? (
+                            <a
+                              href={`/admin/preview/${sc.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-slate-500 border border-gray-200 rounded-lg hover:border-[#C9A84C] hover:text-[#C9A84C] transition-colors whitespace-nowrap"
+                            >
+                              <span>👁</span> Preview
+                            </a>
+                          ) : null;
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -465,19 +537,19 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
           <DealManagerTab deals={deals} />
         )}
 
-        {/* ── ANNOUNCEMENTS ── */}
-        {activeTab === "Announcements" && (
-          <AnnouncementsTab announcements={announcements} />
+        {/* ── PREMIUM FINANCE ── */}
+        {activeTab === "Premium Finance" && (
+          <PremiumFinanceTab />
         )}
 
-        {/* ── ACTIVITY ── */}
-        {activeTab === "Activity" && (
-          <ActivityFeedTab />
+        {/* ── COLLATERAL MONITOR ── */}
+        {activeTab === "Collateral Monitor" && (
+          <CollateralMonitorTab />
         )}
 
-        {/* ── ONBOARDING ── */}
-        {activeTab === "Onboarding" && (
-          <OnboardingTab />
+        {/* ── CRITICAL DATES ── */}
+        {activeTab === "Critical Dates" && (
+          <CriticalDatesTab />
         )}
 
         {/* ── REPORTS ── */}
@@ -492,9 +564,22 @@ export default function AdminClient({ adminEmail, goals: initialGoals, clients, 
 
       </div>
 
+      {/* AI Assistant */}
+      <AIAssistant
+        adminEmail={adminEmail}
+        clients={clients}
+        actionItems={actionItems}
+        deals={deals}
+        announcements={announcements}
+      />
+
       {/* Client Detail Panel */}
       {panelClient && (
-        <ClientDetailPanel client={panelClient} onClose={() => setPanelClient(null)} />
+        <ClientDetailPanel
+          client={panelClient}
+          onClose={() => setPanelClient(null)}
+          previewUrl={`/admin/preview/${panelClient.id}`}
+        />
       )}
     </div>
   );

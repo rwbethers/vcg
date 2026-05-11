@@ -428,6 +428,16 @@ document.getElementById('hdr-subtitle').textContent = [CFG.product, CFG.carrier,
 document.getElementById('hdr-date').textContent   = (CFG.advisor||'Vision Consulting Group') + (CFG.date ? ' · ' + CFG.date : '');
 document.getElementById('nav-date').textContent   = CFG.date ? 'Illustration — ' + CFG.date : 'Hypothetical Illustration';
 
+// When embedded inside the client portal iframe, hide the header (name is shown in the portal)
+// and hide the internal sticky-nav (the portal provides its own section tabs)
+if (window.self !== window.top) {
+  var hdr = document.querySelector('.header');
+  var nav = document.querySelector('.sticky-nav');
+  if (hdr) hdr.style.display = 'none';
+  if (nav) nav.style.display = 'none';
+  document.querySelector('.page-wrap').style.paddingTop = '12px';
+}
+
 // ── Policy constants ──────────────────────────────────────────────────
 const ANNUAL_PREM = CFG.annualPrem  || 500000;
 const PREM_YEARS  = CFG.premYears   || 7;

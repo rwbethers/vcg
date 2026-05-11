@@ -65,14 +65,8 @@ export default function UnderwritingDashboard({ client }: Props) {
       <header className="bg-[#0A1628] sticky top-0 z-30">
         <div className="px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 border border-[#C9A84C] rounded-full flex items-center justify-center">
-                <span className="text-[#C9A84C] text-xs">V</span>
-              </div>
-              <div>
-                <span className="text-white text-sm font-light tracking-widest uppercase">Vision</span>
-                <span className="text-[#C9A84C] text-[9px] tracking-widest uppercase ml-2">Consulting Group</span>
-              </div>
+            <div className="bg-white rounded-xl px-4 py-2 inline-block">
+              <img src="/vcg-logo.png" alt="Vision Consulting Group" className="h-7 w-auto" />
             </div>
           </div>
           <div className="flex items-center gap-4">

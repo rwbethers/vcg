@@ -33,14 +33,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0A1628] flex flex-col items-center justify-center px-4">
       {/* Logo */}
       <div className="mb-12 text-center">
-        <div className="flex items-center justify-center gap-4 mb-3">
-          <div className="w-14 h-14 border border-[#C9A84C] rounded-full flex items-center justify-center">
-            <span className="text-[#C9A84C] font-light text-2xl tracking-wider">V</span>
-          </div>
-          <div className="text-left">
-            <div className="text-white text-2xl font-extralight tracking-[0.2em] uppercase">Vision</div>
-            <div className="text-[#C9A84C] text-[10px] tracking-[0.35em] uppercase">Consulting Group</div>
-          </div>
+        <div className="inline-block bg-white rounded-2xl px-8 py-5 mb-4">
+          <img src="/vcg-logo.png" alt="Vision Consulting Group" className="h-14 w-auto" />
         </div>
         <p className="text-slate-500 text-xs tracking-widest uppercase mt-4">Premium Insurance &amp; Finance</p>
       </div>

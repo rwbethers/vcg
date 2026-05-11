@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import DashboardClient from "./DashboardClient";
 import ProspectDashboard from "./ProspectDashboard";
 import UnderwritingDashboard from "./UnderwritingDashboard";
+import fs from "fs";
+import path from "path";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -31,7 +33,7 @@ export default async function DashboardPage() {
     return <UnderwritingDashboard client={clientData} />;
   }
 
-  const [{ data: policies }, { data: actionItems }, { data: deals }, { data: documents }, { data: announcements }, { data: illustrations }] =
+  const [{ data: policies }, { data: actionItems }, { data: deals }, { data: documents }, { data: announcements }, { data: illustrations }, { data: collateralAccounts }] =
     await Promise.all([
       supabase.from("policies").select("*").eq("client_id", clientData.id).order("issue_date"),
       supabase.from("action_items").select("*").eq("client_id", clientData.id).eq("completed", false).order("due_date"),
@@ -39,7 +41,16 @@ export default async function DashboardPage() {
       supabase.from("documents").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }),
       supabase.from("announcements").select("*").eq("active", true).order("created_at", { ascending: false }).limit(1),
       supabase.from("illustrations").select("*").eq("client_id", clientData.id).order("created_at", { ascending: false }).limit(1),
+      supabase.from("collateral_accounts").select("*").eq("client_id", clientData.id).order("created_at"),
     ]);
+
+  const policyIllustrationUrls: Record<string, string> = {};
+  for (const policy of policies ?? []) {
+    const filePath = path.join(process.cwd(), "public", "illustrations", `${policy.policy_number}_1.pdf`);
+    if (fs.existsSync(filePath)) {
+      policyIllustrationUrls[policy.policy_number] = `/illustrations/${policy.policy_number}_1.pdf`;
+    }
+  }
 
   return (
     <DashboardClient
@@ -50,6 +61,8 @@ export default async function DashboardPage() {
       documents={documents ?? []}
       announcement={announcements?.[0] ?? null}
       illustration={illustrations?.[0] ?? null}
+      collateralAccounts={collateralAccounts ?? []}
+      policyIllustrationUrls={policyIllustrationUrls}
     />
   );
 }

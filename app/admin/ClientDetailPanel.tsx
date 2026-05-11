@@ -50,6 +50,7 @@ interface DealInterest {
 interface Props {
   client: Client;
   onClose: () => void;
+  previewUrl?: string;
 }
 
 const fmt = (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -63,7 +64,7 @@ const priorityColors: Record<string, string> = {
   Low: "bg-slate-100 text-slate-500",
 };
 
-export default function ClientDetailPanel({ client, onClose }: Props) {
+export default function ClientDetailPanel({ client, onClose, previewUrl }: Props) {
   const [activeTab, setActiveTab] = useState("Overview");
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
@@ -114,7 +115,19 @@ export default function ClientDetailPanel({ client, onClose }: Props) {
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none mt-1">×</button>
+            <div className="flex items-center gap-2">
+              {previewUrl && (
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#C9A84C] hover:bg-[#E8C96C] text-[#0A1628] text-[10px] font-bold uppercase tracking-widest rounded-lg transition-colors whitespace-nowrap"
+                >
+                  View Portal
+                </a>
+              )}
+              <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+            </div>
           </div>
           <div className="flex gap-1 mt-4">
             {tabs.map((t) => (

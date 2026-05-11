@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
-import CashValueSection from "./CashValueSection";
+import { useState, useRef } from "react";
 import TaxStrategySection from "./TaxStrategySection";
 import ContactAdvisorSection from "./ContactAdvisorSection";
 import PrivateMarketsSection from "./PrivateMarketsSection";
 import DocumentsSection from "./DocumentsSection";
-import RefinanceSection from "./RefinanceSection";
+import CollateralAccountSection from "./CollateralAccountSection";
+import IndexCreditingWidget from "./IndexCreditingWidget";
+import MarketSummaryCards from "./MarketSummaryCards";
+import PremiumFinanceLoanSection from "./PremiumFinanceLoanSection";
 
 interface Client {
   id: string;
@@ -97,6 +99,19 @@ interface Illustration {
   created_at: string;
 }
 
+interface CollateralAccount {
+  id: string;
+  lender: string;
+  loan_amount: number;
+  loan_balance: number;
+  interest_rate: number;
+  collateral_value: number;
+  required_ratio: number;
+  status: string;
+  notes: string | null;
+  policy_id: string | null;
+}
+
 interface Props {
   client: Client;
   policies: Policy[];
@@ -105,6 +120,8 @@ interface Props {
   documents: Document[];
   announcement: Announcement | null;
   illustration: Illustration | null;
+  collateralAccounts: CollateralAccount[];
+  policyIllustrationUrls?: Record<string, string>;
 }
 
 const statusColors: Record<string, string> = {
@@ -131,10 +148,11 @@ const fmtPayUp = (d: string | null) => {
 
 const navItems = [
   { label: "Overview", icon: "▦" },
+  { label: "Premium Finance Loan", icon: "⬢" },
+  { label: "Collateral Account", icon: "⬡" },
   { label: "Policies", icon: "◈" },
-  { label: "Projections", icon: "◑" },
-  { label: "Refinance", icon: "⟲" },
-  { label: "Cash Value", icon: "◎" },
+  { label: "My Dashboard", icon: "◑" },
+  { label: "Policy Performance", icon: "◎" },
   { label: "Tax Strategy", icon: "⟁" },
   { label: "Private Markets", icon: "◉" },
   { label: "Documents", icon: "⊟" },
@@ -152,12 +170,13 @@ const highlights = [
 const sectionTitles: Record<string, { title: string; sub: string }> = {
   Overview: { title: "Portfolio Overview", sub: "Values sourced from carrier statements · All values in USD" },
   Policies: { title: "My Policies", sub: "Full detail on each insurance policy in your portfolio" },
-  Projections: { title: "Policy Projections", sub: "Interactive illustration — adjust rate and year to model different scenarios" },
-  Refinance: { title: "Loan Refinance", sub: "Model refinancing scenarios for your policy loans" },
-  "Cash Value": { title: "Cash Value", sub: "Tax-deferred growth and available liquidity" },
+  "My Dashboard": { title: "My Dashboard", sub: "Long-term projections · Estate value analysis" },
+  "Policy Performance": { title: "Policy Performance", sub: "Your policy in the market today" },
   "Tax Strategy": { title: "Tax Strategy", sub: "How your portfolio is structured to minimize taxes" },
   "Private Markets": { title: "Private Markets", sub: "Exclusive investment opportunities curated for VCG clients" },
   Documents: { title: "Documents", sub: "Statements, illustrations, and policy documents" },
+  "Premium Finance Loan": { title: "Premium Finance Loan", sub: "Loan details · Interest rate · Refinance options" },
+  "Collateral Account": { title: "Collateral Account", sub: "Pledged collateral positions and coverage ratios" },
   "Contact Advisor": { title: "Contact Your Advisor", sub: "Reach out to your Vision Consulting Group team" },
 };
 
@@ -180,8 +199,43 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
   );
 }
 
-export default function DashboardClient({ client, policies, actionItems, deals, documents, announcement, illustration }: Props) {
+export default function DashboardClient({ client, policies, actionItems, deals, documents, announcement, illustration, collateralAccounts, policyIllustrationUrls = {} }: Props) {
   const [activeNav, setActiveNav] = useState("Overview");
+  const [projTab, setProjTab] = useState<"policy" | "projections" | "estate">("policy");
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  const scrollIframeTo = (sectionId: string) => {
+    const iframe = iframeRef.current;
+    const main = mainRef.current;
+    if (!iframe || !main) return;
+    const tryScroll = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) return;
+        const el = doc.getElementById(sectionId);
+        if (!el) return;
+        let elTop = 0;
+        let node: HTMLElement | null = el;
+        while (node && node !== doc.body) {
+          elTop += node.offsetTop;
+          node = node.offsetParent as HTMLElement | null;
+        }
+        let iframeTop = 0;
+        let cur: HTMLElement | null = iframe;
+        while (cur && cur !== main) {
+          iframeTop += cur.offsetTop;
+          cur = cur.offsetParent as HTMLElement | null;
+        }
+        main.scrollTo({ top: iframeTop + elTop - 80, behavior: "smooth" });
+      } catch { /* cross-origin guard */ }
+    };
+    if (iframe.contentDocument?.readyState === "complete") {
+      tryScroll();
+    } else {
+      iframe.addEventListener("load", tryScroll, { once: true });
+    }
+  };
 
   const illustrationConfig = illustration ? {
     name: client.name,
@@ -214,6 +268,13 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
   const totalNetCashValue = activePolicies.reduce((s, p) => s + (p.net_cash_value ?? 0), 0);
   const totalPremium = activePolicies.reduce((s, p) => s + (p.annual_premium ?? 0), 0);
 
+  const activeCollateral = collateralAccounts.filter((a) => a.status === "active");
+  const collateralNet = activeCollateral.reduce(
+    (s, a) => s + (a.collateral_value - a.loan_balance * a.required_ratio),
+    0
+  );
+  const hasCollateral = activeCollateral.length > 0;
+
   const metrics = [
     { label: "Total Death Benefit", value: fmt(totalDeathBenefit), sub: `${activePolicies.length} active ${activePolicies.length === 1 ? "policy" : "policies"}` },
     { label: "Total Cash Value", value: fmt(totalCashValue), sub: "As of last statement" },
@@ -227,15 +288,9 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
     <div className="flex h-screen bg-[#F4F5F7] overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-[#0A1628] flex flex-col flex-shrink-0">
-        <div className="px-6 py-8 border-b border-[#1a3060]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 border border-[#C9A84C] rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-[#C9A84C] text-sm font-light">V</span>
-            </div>
-            <div>
-              <div className="text-white text-sm font-light tracking-[0.15em] uppercase">Vision</div>
-              <div className="text-[#C9A84C] text-[9px] tracking-[0.3em] uppercase">Consulting Group</div>
-            </div>
+        <div className="px-5 py-5 border-b border-[#1a3060]">
+          <div className="bg-white rounded-xl px-4 py-3 inline-block">
+            <img src="/vcg-logo.png" alt="Vision Consulting Group" className="h-8 w-auto" />
           </div>
         </div>
 
@@ -287,17 +342,19 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main ref={mainRef} className="flex-1 overflow-y-auto">
         {/* Header */}
         <div className="bg-white border-b border-gray-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10">
           <div>
             <h1 className="text-[#0A1628] text-lg font-medium">{section.title}</h1>
             <p className="text-slate-400 text-xs mt-0.5">{section.sub}</p>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
-            {activePolicies.length} Active {activePolicies.length === 1 ? "Policy" : "Policies"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+              {activePolicies.length} Active {activePolicies.length === 1 ? "Policy" : "Policies"}
+            </span>
+          </div>
         </div>
 
         {/* Announcement Banner */}
@@ -328,6 +385,8 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
                   </div>
                 ))}
               </div>
+
+              <MarketSummaryCards cashValue={totalCashValue} />
 
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
@@ -430,166 +489,291 @@ export default function DashboardClient({ client, policies, actionItems, deals, 
             </>
           )}
 
-          {/* ── POLICIES ── */}
-          {activeNav === "Policies" && (
-            <div className="space-y-6">
-              {policies.map((p) => (
-                <div key={p.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                  {/* Card Header */}
-                  <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#0A1628] flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#C9A84C] text-xs font-bold">{p.carrier.slice(0, 2).toUpperCase()}</span>
-                      </div>
-                      <div>
-                        <p className="text-[#0A1628] font-semibold text-sm">{p.carrier} — Policy {p.policy_number}</p>
-                        <p className="text-slate-400 text-xs mt-0.5">{p.product_name}</p>
-                      </div>
-                    </div>
-                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${statusColors[p.status] ?? "bg-gray-100 text-gray-500"}`}>
-                      {p.status}
-                    </span>
-                  </div>
-
-                  <div className="p-6 grid grid-cols-3 gap-6">
-                    {/* Column 1 — Coverage */}
-                    <div className="space-y-4">
-                      <p className="text-slate-400 text-[10px] uppercase tracking-widest">Coverage</p>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Face Amount</p>
-                        <p className="text-[#0A1628] text-sm font-medium">{fmt(p.face_amount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Current Death Benefit</p>
-                        <p className="text-[#C9A84C] text-lg font-semibold">{fmt(p.death_benefit)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Product Type</p>
-                        <p className="text-[#0A1628] text-sm">{p.product_type}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Rate Class</p>
-                        <p className="text-[#0A1628] text-sm">{p.rate_class ?? "—"}</p>
-                      </div>
-                    </div>
-
-                    {/* Column 2 — Values & Premium */}
-                    <div className="space-y-4">
-                      <p className="text-slate-400 text-[10px] uppercase tracking-widest">Values & Premium</p>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Cash Value</p>
-                        <p className="text-[#0A1628] text-sm font-medium">{fmt(p.cash_value)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Loan Balance</p>
-                        <p className="text-[#0A1628] text-sm">{fmt(p.loan_balance)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Net Cash Value</p>
-                        <p className="text-green-600 text-sm font-semibold">{fmt(p.net_cash_value)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Annual Premium</p>
-                        <p className="text-[#0A1628] text-sm font-medium">{fmt(p.annual_premium)}</p>
-                      </div>
-                      {p.pay_up_date && (
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Pay-Up Date</p>
-                          <p className="text-[#0A1628] text-sm">{fmtPayUp(p.pay_up_date)}</p>
-                        </div>
-                      )}
-                      {p.dividend_option && (
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Dividend Option</p>
-                          <p className="text-[#0A1628] text-sm">{p.dividend_option}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Column 3 — Ownership & Riders */}
-                    <div className="space-y-4">
-                      <p className="text-slate-400 text-[10px] uppercase tracking-widest">Ownership & Riders</p>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Insured</p>
-                        <p className="text-[#0A1628] text-sm">{p.insured_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Owner</p>
-                        <p className="text-[#0A1628] text-sm">{p.owner_name}</p>
-                        <p className="text-slate-400 text-[10px]">{p.owner_type}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Issue Date</p>
-                        <p className="text-[#0A1628] text-sm">{fmtDate(p.issue_date)}{p.issue_age ? ` (Age ${p.issue_age})` : ""}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-1">MEC Status</p>
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${p.mec_status ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>
-                          {p.mec_status ? "MEC" : "Non-MEC"}
-                        </span>
-                      </div>
-                      {p.riders && p.riders.length > 0 && (
-                        <div>
-                          <p className="text-xs text-slate-400 mb-1.5">Riders</p>
-                          <ul className="space-y-1">
-                            {p.riders.map((r) => (
-                              <li key={r} className="flex items-start gap-1.5 text-xs text-slate-600">
-                                <span className="text-[#C9A84C] mt-0.5 flex-shrink-0">◆</span>
-                                {r}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card Footer */}
-                  <div className="px-6 py-3 bg-[#F9FAFB] border-t border-gray-50 flex items-center justify-between">
-                    <p className="text-slate-400 text-xs">Last statement: {fmtDate(p.last_statement_date)}</p>
-                    <button className="text-xs text-[#C9A84C] hover:underline">Request Inforce Illustration →</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── PROJECTIONS ── */}
-          {activeNav === "Projections" && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ height: "760px" }}>
-                <iframe
-                  src={illustrationUrl}
-                  className="w-full h-full border-0"
-                  title="Policy Illustration"
-                />
-              </div>
-              <p className="text-slate-400 text-[10px] text-center">
-                {illustration
-                  ? `Illustration prepared by ${illustration.advisor_name} · ${illustration.carrier} ${illustration.product_name}`
-                  : "Sample illustration — contact your advisor for a plan specific to your situation"}
-              </p>
-            </div>
-          )}
-
-          {/* ── REFINANCE ── */}
-          {activeNav === "Refinance" && (
-            <RefinanceSection
+          {/* ── PREMIUM FINANCE LOAN ── */}
+          {activeNav === "Premium Finance Loan" && (
+            <PremiumFinanceLoanSection
+              accounts={collateralAccounts}
               policies={policies}
+              advisorName={client.advisor}
               clientId={client.id}
               clientName={client.name}
-              advisorName={client.advisor}
             />
           )}
 
-          {/* ── CASH VALUE ── */}
-          {activeNav === "Cash Value" && (
-            <CashValueSection policies={policies} />
+          {/* ── COLLATERAL ACCOUNT ── */}
+          {activeNav === "Collateral Account" && (
+            <CollateralAccountSection
+              accounts={collateralAccounts}
+              policies={policies}
+            />
+          )}
+
+          {/* ── POLICIES ── */}
+          {activeNav === "Policies" && (
+            <div className="space-y-8">
+              {policies.map((p) => {
+                const illustrationUrl = policyIllustrationUrls[p.policy_number];
+                return (
+                  <div key={p.id} className="space-y-0">
+                    {/* Main Policy Card */}
+                    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                      {/* Card Header */}
+                      <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-[#0A1628] flex items-center justify-center flex-shrink-0">
+                            <span className="text-[#C9A84C] text-xs font-bold">{p.carrier.slice(0, 2).toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <p className="text-[#0A1628] font-semibold text-sm">{p.carrier} — Policy {p.policy_number}</p>
+                            <p className="text-slate-400 text-xs mt-0.5">{p.product_name}</p>
+                          </div>
+                        </div>
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${statusColors[p.status] ?? "bg-gray-100 text-gray-500"}`}>
+                          {p.status}
+                        </span>
+                      </div>
+
+                      <div className="p-6 grid grid-cols-3 gap-6">
+                        {/* Column 1 — Coverage */}
+                        <div className="space-y-4">
+                          <p className="text-slate-400 text-[10px] uppercase tracking-widest">Coverage</p>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Face Amount</p>
+                            <p className="text-[#0A1628] text-sm font-medium">{fmt(p.face_amount)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Current Death Benefit</p>
+                            <p className="text-[#C9A84C] text-lg font-semibold">{fmt(p.death_benefit)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Product Type</p>
+                            <p className="text-[#0A1628] text-sm">{p.product_type}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Rate Class</p>
+                            <p className="text-[#0A1628] text-sm">{p.rate_class ?? "—"}</p>
+                          </div>
+                        </div>
+
+                        {/* Column 2 — Values & Premium */}
+                        <div className="space-y-4">
+                          <p className="text-slate-400 text-[10px] uppercase tracking-widest">Values & Premium</p>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Cash Value</p>
+                            <p className="text-[#0A1628] text-sm font-medium">{fmt(p.cash_value)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Loan Balance</p>
+                            <p className="text-[#0A1628] text-sm">{fmt(p.loan_balance)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Net Cash Value</p>
+                            <p className="text-green-600 text-sm font-semibold">{fmt(p.net_cash_value)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Annual Premium</p>
+                            <p className="text-[#0A1628] text-sm font-medium">{fmt(p.annual_premium)}</p>
+                          </div>
+                          {p.pay_up_date && (
+                            <div>
+                              <p className="text-xs text-slate-400 mb-0.5">Pay-Up Date</p>
+                              <p className="text-[#0A1628] text-sm">{fmtPayUp(p.pay_up_date)}</p>
+                            </div>
+                          )}
+                          {p.dividend_option && (
+                            <div>
+                              <p className="text-xs text-slate-400 mb-0.5">Dividend Option</p>
+                              <p className="text-[#0A1628] text-sm">{p.dividend_option}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Column 3 — Ownership & Riders */}
+                        <div className="space-y-4">
+                          <p className="text-slate-400 text-[10px] uppercase tracking-widest">Ownership & Riders</p>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Insured</p>
+                            <p className="text-[#0A1628] text-sm">{p.insured_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Owner</p>
+                            <p className="text-[#0A1628] text-sm">{p.owner_name}</p>
+                            <p className="text-slate-400 text-[10px]">{p.owner_type}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Issue Date</p>
+                            <p className="text-[#0A1628] text-sm">{fmtDate(p.issue_date)}{p.issue_age ? ` (Age ${p.issue_age})` : ""}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-1">MEC Status</p>
+                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${p.mec_status ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>
+                              {p.mec_status ? "MEC" : "Non-MEC"}
+                            </span>
+                          </div>
+                          {p.riders && p.riders.length > 0 && (
+                            <div>
+                              <p className="text-xs text-slate-400 mb-1.5">Riders</p>
+                              <ul className="space-y-1">
+                                {p.riders.map((r) => (
+                                  <li key={r} className="flex items-start gap-1.5 text-xs text-slate-600">
+                                    <span className="text-[#C9A84C] mt-0.5 flex-shrink-0">◆</span>
+                                    {r}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Footer */}
+                      <div className="px-6 py-3 bg-[#F9FAFB] border-t border-gray-50 flex items-center justify-between">
+                        <p className="text-slate-400 text-xs">Last statement: {fmtDate(p.last_statement_date)}</p>
+                        <button className="text-xs text-[#C9A84C] hover:underline">Request Inforce Illustration →</button>
+                      </div>
+                    </div>
+
+                    {/* Illustration Section */}
+                    {illustrationUrl && (
+                      <div className="bg-white rounded-b-2xl shadow-sm border-t-0 overflow-hidden -mt-2 pt-2">
+                        <div className="border-t-2 border-[#C9A84C]/20 mx-6" />
+                        <div className="px-6 py-5">
+                          <div className="flex items-center justify-between mb-5">
+                            <div>
+                              <p className="text-[#0A1628] font-semibold text-sm">Policy Illustration</p>
+                              <p className="text-slate-400 text-xs mt-0.5">
+                                {p.carrier} · {p.product_name} · Policy {p.policy_number}
+                              </p>
+                            </div>
+                            <a
+                              href={illustrationUrl}
+                              download={`${p.policy_number}_illustration.pdf`}
+                              className="inline-flex items-center gap-2 bg-[#0A1628] hover:bg-[#162040] text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              Download PDF
+                            </a>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-4 mb-5">
+                            <div className="bg-[#F4F5F7] rounded-xl p-4">
+                              <p className="text-slate-400 text-[10px] uppercase tracking-widest mb-1">Face Amount</p>
+                              <p className="text-[#0A1628] text-sm font-semibold">{fmt(p.face_amount)}</p>
+                            </div>
+                            <div className="bg-[#F4F5F7] rounded-xl p-4">
+                              <p className="text-slate-400 text-[10px] uppercase tracking-widest mb-1">Death Benefit</p>
+                              <p className="text-[#C9A84C] text-sm font-semibold">{fmt(p.death_benefit)}</p>
+                            </div>
+                            <div className="bg-[#F4F5F7] rounded-xl p-4">
+                              <p className="text-slate-400 text-[10px] uppercase tracking-widest mb-1">Policy Value</p>
+                              <p className="text-[#0A1628] text-sm font-semibold">{fmt(p.cash_value)}</p>
+                            </div>
+                            <div className="bg-[#F4F5F7] rounded-xl p-4">
+                              <p className="text-slate-400 text-[10px] uppercase tracking-widest mb-1">Annual Premium</p>
+                              <p className="text-[#0A1628] text-sm font-semibold">{fmt(p.annual_premium)}</p>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl overflow-hidden border border-gray-100" style={{ height: "820px" }}>
+                            <iframe
+                              src={illustrationUrl}
+                              className="w-full h-full border-0"
+                              title={`Illustration for policy ${p.policy_number}`}
+                            />
+                          </div>
+                          <p className="text-slate-400 text-[10px] text-center mt-3">
+                            For informational purposes only. Contact your advisor for an updated inforce illustration.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── MY DASHBOARD (Projections) ── */}
+          {activeNav === "My Dashboard" && (
+            <div className="space-y-8">
+
+              {/* Section tabs */}
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="flex border-b border-gray-100">
+                  {[
+                    { key: "policy"      as const, label: "Policy Dashboard",                 anchor: "sec-policy",      sub: "Coverage summary · Premium schedule · Key dates" },
+                    { key: "projections" as const, label: "Long Term Projections Dashboard", anchor: "sec-projections", sub: "Policy growth · Loan payoff · Year-by-year table" },
+                    { key: "estate"      as const, label: "Estate Value Dashboard",           anchor: "sec-estate",      sub: "Net death benefit · Tax-free transfer · Beneficiary allocation" },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => {
+                        setProjTab(tab.key);
+                        scrollIframeTo(tab.anchor);
+                      }}
+                      className={`flex-1 px-6 py-4 text-left border-b-2 transition-all ${
+                        projTab === tab.key
+                          ? "border-[#C9A84C] bg-[#C9A84C]/5"
+                          : "border-transparent hover:bg-gray-50"
+                      }`}
+                    >
+                      <p className={`text-sm font-semibold ${projTab === tab.key ? "text-[#0A1628]" : "text-slate-400"}`}>
+                        {tab.label}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{tab.sub}</p>
+                    </button>
+                  ))}
+                </div>
+
+                <iframe
+                  ref={iframeRef}
+                  src={illustrationUrl}
+                  className="w-full border-0 block"
+                  style={{ height: "0px" }}
+                  title="Policy Illustration"
+                  onLoad={(e) => {
+                    const iframe = e.currentTarget;
+                    try {
+                      const doc = iframe.contentDocument;
+                      if (doc) {
+                        doc.body.style.overflow = "hidden";
+                        doc.documentElement.style.overflow = "hidden";
+                        iframe.style.height = doc.documentElement.scrollHeight + "px";
+                      }
+                    } catch {}
+                    const anchor = projTab === "estate" ? "sec-estate" : projTab === "projections" ? "sec-projections" : "sec-policy";
+                    scrollIframeTo(anchor);
+                  }}
+                />
+
+                <div className="px-6 py-3 bg-[#F9FAFB] border-t border-gray-50 flex items-center justify-between">
+                  <p className="text-slate-400 text-[10px]">
+                    {illustration
+                      ? `${illustration.carrier} · ${illustration.product_name} · Prepared by ${illustration.advisor_name}`
+                      : "Hypothetical illustration · Not a guarantee of future performance"}
+                  </p>
+                  <p className="text-slate-300 text-[10px]">Adjust rate and year sliders inside to model scenarios</p>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ── POLICY PERFORMANCE ── */}
+          {activeNav === "Policy Performance" && (
+            <div className="space-y-6">
+              <IndexCreditingWidget
+                policies={policies}
+                illustratedRate={illustration?.illustrated_rate ?? 7}
+              />
+            </div>
           )}
 
           {/* ── TAX STRATEGY ── */}
           {activeNav === "Tax Strategy" && (
-            <TaxStrategySection policies={policies} clientName={client.name} />
+            <TaxStrategySection policies={policies} clientName={client.name} illustratedRate={illustration?.illustrated_rate ?? 7} />
           )}
 
           {/* ── PRIVATE MARKETS ── */}
