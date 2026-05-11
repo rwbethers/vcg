@@ -8,6 +8,17 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email) { setError("Enter your email first."); return; }
+    const supabase = createClient();
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+    });
+    setResetSent(true);
+    setError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,10 +90,17 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-[#1a3060] text-center">
+        <div className="mt-8 pt-6 border-t border-[#1a3060] flex justify-between items-center">
           <Link href="/" className="text-slate-600 text-xs hover:text-slate-400 transition-colors">
             ← Client portal login
           </Link>
+          {resetSent ? (
+            <span className="text-[#C9A84C] text-xs">Reset link sent ✓</span>
+          ) : (
+            <button onClick={handleForgotPassword} type="button" className="text-slate-500 text-xs hover:text-slate-300 transition-colors">
+              Forgot password?
+            </button>
+          )}
         </div>
       </div>
 
